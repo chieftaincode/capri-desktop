@@ -32,11 +32,19 @@ function summarize(messages) {
 
 async function main() {
   const { app, safeStorage } = require('electron');
+  const report = { stage: 'starting', results: [] };
+  const dir = path.join(root, '.runtime');
+  fs.mkdirSync(dir, { recursive: true });
+  const save = () => fs.writeFileSync(path.join(dir, 'groq-diagnostics.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+  const stage = (value) => { report.stage = value; save(); console.log(`Groq diagnostics: ${value}`); };
+  stage('waiting-for-electron');
   app.setName('capri-desktop');
   app.setPath('userData', path.join(process.env.XDG_CONFIG_HOME || path.join(require('node:os').homedir(), '.config'), 'capri-desktop'));
-  await app.whenReady();
   try {
+    await app.whenReady();
+    stage('reading-settings');
     const config = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'config.json'), 'utf8'));
+    stage('unlocking-key');
     const stored = config.apiKeys?.groq || process.env.GROQ_API_KEY || '';
     const key = stored.startsWith('enc:') ? safeStorage.decryptString(Buffer.from(stored.slice(4), 'base64')) : stored;
     if (!key) throw new Error('Groq key unavailable');
@@ -45,7 +53,7 @@ async function main() {
     while (history.length && history[0].role !== 'user') history.shift();
     const system = { role: 'system', content: 'You are Capri, a friendly desktop companion. Answer in two complete sentences in German.' };
     const question = { role: 'user', content: 'Warum erscheint der Himmel blau? Erkläre es bitte in zwei vollständigen Sätzen.' };
-    const report = { model: config.chatModel, results: [] };
+    report.model = config.chatModel;
     const variants = [
       ['fresh-stream', [], true, {}], ['fresh-json', [], false, {}],
       ['history-stream', history, true, {}],
@@ -53,6 +61,7 @@ async function main() {
         ? { reasoning_effort: 'none', reasoning_format: 'hidden', temperature: 0.7, top_p: 0.8 } : {}],
     ];
     for (const [name, prior, stream, extra] of variants) {
+      stage(name);
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${key}` },
         body: JSON.stringify({ model: config.chatModel, messages: [system, ...prior, question],
@@ -67,18 +76,23 @@ async function main() {
         Object.assign(entry, summarize(frames));
       }
       report.results.push(entry);
+      save();
       console.log(JSON.stringify(entry));
       if (!response.ok) break;
     }
-    const dir = path.join(root, '.runtime');
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, 'groq-diagnostics.json'), JSON.stringify(report, null, 2) + '\n', { mode: 0o600 });
+    stage('complete');
     console.log('Diagnostic report saved to .runtime/groq-diagnostics.json');
+  } catch (err) {
+    report.error = { stage: report.stage, type: err.name };
+    save();
+    throw err;
   } finally { app.quit(); }
 }
 
 module.exports = { summarize };
-if (require.main === module) {
+// Electron's default app imports standalone .js files, so require.main still
+// points at default_app.asar. The Electron branch must run independently of it.
+if (process.versions.electron || require.main === module) {
   if (process.versions.electron) {
     main().catch(() => { console.error('Groq diagnostics failed; no credentials or response text were logged.'); require('electron').app.exit(1); });
   } else {
