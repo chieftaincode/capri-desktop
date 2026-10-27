@@ -221,10 +221,10 @@ export class Chat {
     const messages = [{ role: 'system', content: this.persona() }, ...this.history.slice(-REMEMBER)];
     // In a mood (angry, sulking…): said again right by your message, for this answer only. Small
     // local models mostly go by the last thing they read: up in her prompt alone, they forget it.
-    const mood = !this.agent && this.bond?.moodLine();
-    if (mood) {
+    const moodHint = !this.agent && this.bond?.moodLine();
+    if (moodHint) {
       const last = messages.at(-1);
-      messages[messages.length - 1] = { ...last, content: `${last.content}\n\n(Note for you, never repeat it: ${mood.replace(/^Right now: /, '')})` };
+      messages[messages.length - 1] = { ...last, content: `${last.content}\n\n(Note for you, never repeat it: ${moodHint.replace(/^Right now: /, '')})` };
     }
     // nothing yet after a few seconds: Ollama is still loading the model (the first answer after a start),
     // or Claude Code is at work
