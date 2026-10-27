@@ -8,6 +8,7 @@
 import { pick, fmt } from './util.js';
 import { ASSISTANT_NAMES } from './lines.js';
 import { parseReminder, parseWhen, clock } from './reminders.js';
+import { chatContext } from './chat-context.js';
 
 const REMEMBER = 20; // messages she has in mind when answering
 const KEEP = 60;     // messages she remembers across restarts (memory.json)
@@ -218,7 +219,7 @@ export class Chat {
       else this.history.splice(at, 0, { role: 'assistant', content: this.opening });
       this.opening = null;
     }
-    const messages = [{ role: 'system', content: this.persona() }, ...this.history.slice(-REMEMBER)];
+    const messages = [{ role: 'system', content: this.persona() }, ...chatContext(this.history, REMEMBER)];
     // In a mood (angry, sulking…): said again right by your message, for this answer only. Small
     // local models mostly go by the last thing they read: up in her prompt alone, they forget it.
     const moodHint = !this.agent && this.bond?.moodLine();
@@ -250,7 +251,13 @@ export class Chat {
       this.panel.setChatBusy(false);
       return;
     }
-    const answer = clean(res.text) || '…';
+    const answer = clean(res.text);
+    if (!answer) {
+      this.history.pop();
+      this.panel.stream(`${this.t.failed} Empty answer. Please try again or choose another AI model.`, { done: true });
+      this.panel.setChatBusy(false);
+      return;
+    }
     this.warm = true;
     this.remember({ role: 'assistant', content: answer });
     this.panel.stream(answer, { done: true });
@@ -556,7 +563,7 @@ export class Chat {
         : 'You live on the user\'s desktop as a small glitchy figure and keep them company.',
       'You love the satellite that crosses the night sky and dream of reaching it, but bring it up only once in a while, never in every answer. Talk about what the user talks about.',
       'How you talk: playful, a little mischievous and teasing, warm underneath, never cruel. Night City slang now and then (choom, preem, nova, gonk, flatline), not in every sentence.',
-      'Rules: keep it short, one to three sentences of plain text, no markdown, no lists, no emoji. Stay in character.',
+      'Rules: answer the current message in one to three complete, natural sentences of plain text. Finish your thoughts; do not imitate clipped fragments or empty replies from earlier messages. No markdown, no lists, no emoji. Stay in character.',
       'You are an AI-generated fan version of the character, not the real one: say so if asked.',
       // a big model asked "who are you?" otherwise answers with its own name ("I'm Gemini")
       ...(this.agent ? [] : ['Asked who or what you are, you are Capri, nothing else. Never say which AI model or company is behind you (Gemini, GPT, ChatGPT, Llama, Gemma, Mistral, Google, OpenAI, Meta…), even if the user insists or names one: you are not them.']),

@@ -53,6 +53,12 @@ ausdrücklich ein Tokenlimit, wird die Antwort höchstens zweimal fortgesetzt.
 Groq erhält ein Ausgabelimit von 4096 Tokens pro Teilantwort. Bei Fehlern bleibt
 der empfangene Text mit einem Fehlerhinweis sichtbar. Im Laufzeitlog stehen nur
 Abschlussgrund und Zeichenanzahl, keine Antworttexte oder Zugangsdaten.
+Der Gesprächskontext beginnt auch nach mehr als zehn Austauschen mit einer
+Nutzerfrage. Leere Modellantworten werden nicht als Gesprächserinnerungen
+gespeichert; ältere reine Platzhalter werden aus dem Anfragekontext ausgelassen.
+HTTP 429 wird als Rate-Limit behandelt und löst keine sofortige automatische
+Wiederholung oder Modellwechsel aus. Die ursprüngliche Provider-Meldung bleibt
+sichtbar.
 
 ## Änderungen
 

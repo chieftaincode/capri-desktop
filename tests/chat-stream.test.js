@@ -48,6 +48,25 @@ test('Normal completion is accepted even without punctuation, with no extra requ
   assert.equal(fetch.mock.callCount(), 1);
 });
 
+test('Empty provider completions fail visibly instead of becoming ellipses in memory', async (t) => {
+  const fetch = t.mock.method(globalThis, 'fetch', async () => reply('', 'stop'));
+  await assert.rejects(chat('groq', cfg, input, () => {}), /Empty answer/);
+  assert.equal(fetch.mock.callCount(), 1);
+});
+
+test('Free-plan rate limits have a separate code from transient server overload', async (t) => {
+  const fetch = t.mock.method(globalThis, 'fetch', async () => new Response(
+    JSON.stringify({ error: { message: 'Rate limit reached. Try again in 30 seconds.' } }),
+    { status: 429, headers: { 'retry-after': '30' } }));
+  await assert.rejects(chat('groq', cfg, input, () => {}), (err) => {
+    assert.equal(err.code, 'rate_limit');
+    assert.equal(err.status, 429);
+    assert.match(err.message, /30 seconds/);
+    return true;
+  });
+  assert.equal(fetch.mock.callCount(), 1);
+});
+
 test('Repeated length limits are bounded and retain the full partial reply', async (t) => {
   const fetch = t.mock.method(globalThis, 'fetch', async () => reply('part ', 'length'));
   await assert.rejects(chat('groq', cfg, input, () => {}), (err) => {

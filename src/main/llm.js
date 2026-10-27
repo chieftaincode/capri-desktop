@@ -53,7 +53,8 @@ async function failure(res) {
   } catch {
     // not JSON: the start of the body says it
   }
-  const code = res.status === 429 || res.status === 503 || /overloaded|high demand|unavailable/i.test(message) ? 'busy'
+  const code = res.status === 429 ? 'rate_limit'
+    : res.status === 503 || /overloaded|high demand|unavailable/i.test(message) ? 'busy'
     : res.status === 404 ? 'gone' : null;
   return Object.assign(new Error(message), { status: res.status, code });
 }
@@ -102,10 +103,16 @@ async function openaiChat(p, { model, messages }, onDelta, signal) {
           ...(p.env === 'GROQ_API_KEY' ? { max_completion_tokens: 4096 } : {}) }),
         signal,
       });
-      if (!res.ok) throw await failure(res);
+      if (!res.ok) {
+        console.warn(`[capri] chat HTTP status=${res.status} retry-after=${res.headers.get('retry-after') || 'unknown'}`);
+        throw await failure(res);
+      }
       const result = await readChatStream(res.body, (piece) => { text += piece; onDelta(piece); });
       console.log(`[capri] chat finish=${result.finishReason || 'done'} characters=${result.text.length} part=${attempt + 1}`);
-      if (!result.finishReason || result.finishReason === 'stop') return text;
+      if (!result.finishReason || result.finishReason === 'stop') {
+        if (!text.trim()) throw new Error('Empty answer from the AI provider. Please try again or choose another AI model.');
+        return text;
+      }
       if (result.finishReason !== 'length') throw new Error(`The provider ended this answer (${result.finishReason}).`);
       if (attempt === 2 || !result.text.trim()) throw new Error('The answer reached the provider limit. Please ask for a shorter answer.');
       // Only a confirmed token limit triggers a continuation, never punctuation guesses.
