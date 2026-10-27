@@ -886,6 +886,7 @@ function main() {
     });
     createBridge({
       port: PORT,
+      getStatus: linux ? () => ({ desktop: linux.status() }) : undefined,
       // her own Claude Code chat's hooks would cover its answer with theirs
       onEvent: (evt) => !llm.isChatSession(evt.session_id) && overlay?.webContents.send('claude:event', evt),
       onDebug: DEV ? debugHandler : null,

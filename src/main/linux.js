@@ -39,6 +39,7 @@ function startWindowWatch({ overlay, onUpdate }) {
       try {
         const data = JSON.parse(line);
         if (!Array.isArray(data.wins)) return;
+        if (!snapshot) console.log('[capri] desktop bridge connected:', data.logical ? 'KWin' : 'X11');
         snapshot = data;
         send();
       } catch (err) { console.error('[capri] invalid window snapshot:', err.message); }
@@ -58,6 +59,8 @@ function startWindowWatch({ overlay, onUpdate }) {
 
 // KWin's cursor is in the same logical coordinates as its window geometries.
 function cursor() { return snapshot?.logical ? snapshot.cursor : null; }
+function status() { return { connected: Boolean(snapshot), backend: snapshot ? (snapshot.logical ? 'kwin' : 'x11') : null,
+  windows: snapshot?.wins?.length || 0 }; }
 
 const KEEP = /^(?:kwin.*|plasmashell|ksmserver|kscreenlocker.*|kded.*|org\.kde\.plasmashell|capri.*|electron.*|claude.*|codex.*|ollama.*)$/i;
 function openApps() {
@@ -145,5 +148,5 @@ function setStartup(enabled, root) {
   fs.writeFileSync(startupFile(), desktopEntry(exe, args, icon));
 }
 
-module.exports = { startWindowWatch, cursor, openApps, closeApp, desktopApps, launchApp, epicGames, media,
+module.exports = { startWindowWatch, cursor, status, openApps, closeApp, desktopApps, launchApp, epicGames, media,
   desktopEntry, startupEnabled, setStartup };

@@ -62,7 +62,9 @@ def kwin(parent_pid):
         script = Path(tmp) / 'main.js'
         source = Path(__file__).with_name('kwin.js').read_text()
         script.write_text(source.replace('__CAPRI_BUS__', name).replace('__CAPRI_PID__', str(parent_pid)))
-        script_id = int(manager.loadScript(str(script), plugin))
+        # Qt exports both loadScript(s) and loadScript(ss). dbus-python caches
+        # one introspection signature per name, so select this overload explicitly.
+        script_id = int(manager.loadScript(str(script), plugin, signature='ss'))
         if script_id < 0:
             raise RuntimeError('KWin refused to load the Capri geometry script')
         try:
