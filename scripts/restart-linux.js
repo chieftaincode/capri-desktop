@@ -15,7 +15,15 @@ async function main() {
   if (before) {
     if (before.name !== 'capri' || !Number.isSafeInteger(before.pid)) throw new Error('The bridge port belongs to another application');
     const args = fs.readFileSync(`/proc/${before.pid}/cmdline`, 'utf8').split('\0');
-    if (!args.includes(root)) throw new Error('The running Capri belongs to another installation; please close it from its tray menu');
+    // Electron can replace its original argv with the process title. In that
+    // case, verify both its working directory and the Electron executable.
+    const cwd = fs.realpathSync(`/proc/${before.pid}/cwd`);
+    const exe = fs.readlinkSync(`/proc/${before.pid}/exe`);
+    const sameDirectory = cwd === fs.realpathSync(root);
+    const electronProcess = /^(?:electron\d*|capri)$/i.test(path.basename(exe));
+    if (!args.includes(root) && !(sameDirectory && electronProcess)) {
+      throw new Error(`The running Capri could not be matched to this installation (cwd: ${cwd}, executable: ${exe}); please close it from its tray menu`);
+    }
     process.kill(before.pid, 'SIGTERM');
     for (let i = 0; i < 50 && await health(); i++) await wait(100);
     if (await health()) throw new Error('Capri did not stop; please close it from its tray menu');
