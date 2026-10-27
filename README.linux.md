@@ -34,6 +34,7 @@ Die Logs liegen in `.runtime/setup.log` und `.runtime/capri.log`.
 | Auf Fenstern sitzen, mitfahren, fallen, Fenster-Effekte | Temporäres KWin-6-Skript für native Wayland- und X11-Fenster, inklusive Stapelreihenfolge, Arbeitsflächen und Aktivitäten |
 | Aktives Fenster, Antworten bei Fokuswechsel, andere AIs erkennen | KWin meldet IDs und AI-Namensübereinstimmungen; Fenstertitel und Inhalte werden nicht übertragen |
 | Transparenz und Mausinteraktion | Electron läuft unter XWayland; Zeigerabfrage ersetzt die unter Linux fehlende Weiterleitung von Mausbewegungen |
+| Chat- und API-Key-Eingaben | Von Anfang an fokussierbares Linux-Fenster; nativer Fenster- und Web-Inhalt-Fokus beim Öffnen und erneuten Anklicken eines Eingabefelds |
 | Mehrere Bildschirme | Vorhandene Electron-Bildschirmsteuerung, KWin-Koordinaten und globaler Mauszeiger |
 | Anwendungen öffnen | Gio-Anwendungskatalog und `gtk-launch`, einschließlich registrierter Flatpak-Programme |
 | Anwendungen schließen | KWin sendet normales Schließen an die ausdrücklich ausgewählten Fenster; erzwungenes Beenden bleibt hinter der vorhandenen Bestätigung |
@@ -91,12 +92,15 @@ Die KWin-Vertragsprüfungen (simulierte API), der echte Gio-Anwendungskatalog,
 Desktop-Dateien einschließlich Sonderzeichen und die netzwerkfreien Hook-Tests
 wurden lokal geprüft. Ein Linux-Paket wurde aus dem System-Electron gebaut.
 
-Die Coding-Sandbox verweigert Desktop-D-Bus, lokale Listen-Sockets und den
-grafischen Electron-Start. Deshalb ist die Portierung **noch nicht grafisch auf
-der laufenden KDE-Sitzung abgenommen**. Fenster- und Eingabeverhalten, insbesondere
-bei unterschiedlichen Skalierungsfaktoren mehrerer Bildschirme, müssen im echten
-Desktop geprüft werden. Das Abschluss-Skript führt dort die vollständigen
-Hook-Tests, die KWin-Zugriffsprüfung und einen Bridge-Healthcheck aus.
+Die vollständigen 14 ursprünglichen Portierungs- und Hook-Tests wurden danach in
+der normalen Desktop-Sitzung ausgeführt und bestanden. Die laufende KWin-Brücke
+meldete 13 erkannte Fenster; Anklicken und Bedienung wurden vom Benutzer bestätigt.
+Für die spätere Korrektur der Tastatureingabe gibt es zusätzliche Regressionstests.
+Die Coding-Sandbox selbst verweigert Desktop-D-Bus, lokale Listen-Sockets und den
+grafischen Electron-Start. Ein Neustart mit abschließendem Verbindungscheck ist
+deshalb über `bash scripts/update-linux.sh` im normalen Terminal möglich. Die
+Eingabe muss nach dem Update noch im echten Desktop geprüft werden; eigene
+API-Zugangsdaten werden für diese Prüfungen nicht gelesen oder ausgegeben.
 
 Die Lizenz und Rechte an Figurenbildern bleiben unverändert; siehe [README](README.md)
 und [LICENSE](LICENSE).

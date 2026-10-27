@@ -13,6 +13,7 @@ const config = require('./config');
 const { TRAY, LANGS } = require('./labels');
 const { createBridge } = require('./bridge');
 const { startWindowWatch } = require('./windows');
+const { inputWindowOptions, focusInput } = require('./overlay-input');
 const llm = require('./llm');
 const setup = require('./setup');
 const apps = require('./apps');
@@ -177,7 +178,7 @@ function createOverlay() {
     maximizable: false,
     fullscreenable: false,
     skipTaskbar: true,
-    focusable: false,
+    ...inputWindowOptions(),
     hasShadow: false,
     alwaysOnTop: true,
     type: process.platform === 'win32' ? 'toolbar' : undefined,
@@ -193,6 +194,8 @@ function createOverlay() {
   });
 
   overlay.on('page-title-updated', (event) => event.preventDefault());
+  overlay.on('focus', () => overlay?.webContents.send('overlay:focused'));
+  if (linux) overlay.setVisibleOnAllWorkspaces(true);
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.loadURL('capri://app/src/renderer/index.html');
@@ -699,12 +702,7 @@ function registerIpc() {
   ipcMain.handle('apps:music', (_e, query) => launch.music(query).catch(() => false));
   ipcMain.handle('apps:site', (_e, address) => launch.site(address).catch(() => false));
   // typing to her: the overlay takes the keyboard while the chat is open, and gives it back after
-  ipcMain.on('overlay:focus', (_e, on) => {
-    if (!overlay) return;
-    overlay.setFocusable(Boolean(on));
-    if (on) overlay.focus();
-    else overlay.blur();
-  });
+  ipcMain.handle('overlay:focus', (_e, on) => focusInput(overlay, Boolean(on)));
   // her report card's copy button: a picture of that part of the overlay, on the clipboard
   ipcMain.handle('panel:copy', async (_e, rect) => {
     const image = await overlay.webContents.capturePage(rect);

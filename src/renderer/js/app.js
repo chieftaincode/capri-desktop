@@ -77,6 +77,10 @@ async function boot() {
     panel: document.getElementById('panel'),
     ticker: document.getElementById('ticker'),
     labels: linesFor(config.lang, config.assistant),
+    requestInputFocus: () => host.focusOverlay(true),
+  });
+  host.onOverlayFocus(() => {
+    if (panel.current?.chat && !panel.chatInput.disabled) panel.chatInput.focus();
   });
 
   const capri = new Capri({

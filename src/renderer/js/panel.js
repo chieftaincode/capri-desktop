@@ -23,7 +23,7 @@ const DECODE_STEP_MS = 28;
 const COUNT_MS = 700; // her report's numbers counting up
 
 export class Panel {
-  constructor({ panel, ticker, labels }) {
+  constructor({ panel, ticker, labels, requestInputFocus = () => {} }) {
     this.el = panel;
     this.tickerEl = ticker;
     this.labels = labels;
@@ -64,6 +64,9 @@ export class Panel {
     this.chatSend = panel.querySelector('.panel__send');
     this.chatClose = panel.querySelector('.panel__close');
     this.note = panel.querySelector('.panel__note');
+    // Also reacquire the native keyboard after visiting the provider's website
+    // or switching to another app to copy a key. Never reads the clipboard.
+    this.chatInput.addEventListener('pointerdown', () => requestInputFocus());
     this.chatForm.addEventListener('click', (e) => e.stopPropagation());
     this.chatForm.addEventListener('submit', (e) => {
       e.preventDefault();

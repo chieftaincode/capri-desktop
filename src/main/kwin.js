@@ -19,7 +19,12 @@ function tick() {
   const wins = [];
   for (let i = stack.length - 1; i >= 0; i--) {
     const w = stack[i];
-    if ((w.pid === selfPid && w.caption === 'Capri Desktop Overlay') || !visible(w) || (!w.normalWindow && !w.dialog)) continue;
+    if (w.pid === selfPid && w.caption === 'Capri Desktop Overlay') {
+      w.skipSwitcher = true;
+      w.skipPager = true;
+      continue;
+    }
+    if (!visible(w) || (!w.normalWindow && !w.dialog)) continue;
     const r = w.frameGeometry;
     if (r.width < 200 || r.height < 120) continue;
     wins.push({ id: String(w.internalId), x: r.x, y: r.y, w: r.width, h: r.height,
