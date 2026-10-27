@@ -9,7 +9,11 @@ exec > >(tee .runtime/setup.log) 2>&1
 command -v gh >/dev/null
 gh auth status
 capri_login=$(gh api user --jq '.login')
-capri_parent=$(gh api "repos/$capri_login/capri-desktop" --jq '.parent.full_name' 2>/dev/null || true)
+if ! capri_parent=$(gh api "repos/$capri_login/capri-desktop" --jq '.parent.full_name' 2>/dev/null); then
+  # gh prints an HTTP error body to stdout even with --jq. A failed lookup is
+  # not evidence that an unrelated repository exists.
+  capri_parent=''
+fi
 if [[ -z "$capri_parent" ]]; then
   gh repo fork mochiiwuff/capri-desktop --clone=false --remote=false
 elif [[ "$capri_parent" != 'mochiiwuff/capri-desktop' ]]; then
