@@ -15,7 +15,7 @@ if ! capri_parent=$(gh api "repos/$capri_login/capri-desktop" --jq '.parent.full
   capri_parent=''
 fi
 if [[ -z "$capri_parent" ]]; then
-  gh repo fork mochiiwuff/capri-desktop --clone=false --remote=false
+  gh api --method POST repos/mochiiwuff/capri-desktop/forks --jq '.full_name'
 elif [[ "$capri_parent" != 'mochiiwuff/capri-desktop' ]]; then
   echo 'An unrelated capri-desktop repository already exists in your account; nothing overwritten.' >&2
   exit 1

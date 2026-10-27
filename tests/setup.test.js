@@ -23,7 +23,10 @@ case "$1 $2" in
       existing-fork) echo mochiiwuff/capri-desktop ;;
       unrelated) echo null ;;
     esac ;;
-  'repo fork') echo fork >> "$CAPRI_TEST_DIR/actions" ;;
+  'api --method')
+    [ "$3" = POST ] && [ "$4" = repos/mochiiwuff/capri-desktop/forks ] || exit 98
+    echo fork >> "$CAPRI_TEST_DIR/actions"
+    echo test-owner/capri-desktop ;;
   *) exit 99 ;;
 esac
 `;
