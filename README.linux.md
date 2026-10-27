@@ -27,6 +27,24 @@ Danach den Coding-Assistenten neu starten. Autostart kann im Capri-Menü über
 
 Die Logs liegen in `.runtime/setup.log` und `.runtime/capri.log`.
 
+## Claude Code zusätzlich verbinden
+
+Im normalen Desktop-Terminal:
+
+```bash
+node /run/media/elia/S/capri-desktop/scripts/connect-claude-linux.js
+```
+
+Das Skript prüft Claude Code und die Integrationstests, installiert die
+[Claude-Code-Hooks](https://code.claude.com/docs/en/hooks) mit Sicherung der
+vorhandenen Einstellungen und startet Capri mit Claude Code als beobachtetem
+Assistenten neu. Danach eine neue Claude-Code-Sitzung starten. Bei deren erster
+Aktivität bestätigt Capri die Verbindung.
+
+Groq bleibt als Chat-Anbieter erhalten. Vorhandene Codex-Hooks bleiben installiert;
+im Capri-Menü kann zwischen den beobachteten Assistenten gewechselt werden.
+Capri beobachtet jeweils den ausgewählten Assistenten.
+
 ## Änderungen
 
 | Funktion | Linux-Anbindung |

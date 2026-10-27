@@ -10,7 +10,7 @@ async function health() {
   try { return await (await fetch(endpoint, { signal: AbortSignal.timeout(1000) })).json(); }
   catch { return null; }
 }
-async function main() {
+async function main({ beforeStart = () => {} } = {}) {
   const before = await health();
   if (before) {
     if (before.name !== 'capri' || !Number.isSafeInteger(before.pid)) throw new Error('The bridge port belongs to another application');
@@ -28,6 +28,7 @@ async function main() {
     for (let i = 0; i < 50 && await health(); i++) await wait(100);
     if (await health()) throw new Error('Capri did not stop; please close it from its tray menu');
   }
+  await beforeStart(); // configuration changes are safe after the old process has stopped
   fs.mkdirSync(path.join(root, '.runtime'), { recursive: true });
   const log = fs.openSync(path.join(root, '.runtime/capri.log'), 'w');
   const child = spawn(process.execPath, [path.join(root, 'scripts/start-linux.js')], {
@@ -50,4 +51,5 @@ async function main() {
   console.error(fs.readFileSync(path.join(root, '.runtime/capri.log'), 'utf8'));
   throw new Error('Capri did not confirm its desktop bridge, fullscreen role, and bounded input shape');
 }
-main().catch((err) => { console.error(err.message); process.exitCode = 1; });
+module.exports = { restart: main };
+if (require.main === module) main().catch((err) => { console.error(err.message); process.exitCode = 1; });
