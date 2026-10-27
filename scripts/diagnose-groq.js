@@ -99,7 +99,12 @@ if (process.versions.electron || require.main === module) {
     const { spawnSync } = require('node:child_process');
     const env = { ...process.env, ELECTRON_FORCE_IS_PACKAGED: 'false', ELECTRON_IS_DEV: '1' };
     delete env.ELECTRON_RUN_AS_NODE;
-    const result = spawnSync(process.env.CAPRI_ELECTRON || '/usr/bin/electron42', [__filename, '--ozone-platform=x11'], { cwd: root, env, stdio: 'inherit' });
+    const live = process.argv.includes('--live');
+    if (live) env.CAPRI_DIAGNOSE_GROQ = '1';
+    const result = live
+      ? spawnSync(process.execPath, [path.join(__dirname, 'restart-linux.js')], { cwd: root, env, stdio: 'inherit' })
+      : spawnSync(process.env.CAPRI_ELECTRON || '/usr/bin/electron42', [__filename, '--ozone-platform=x11'], { cwd: root, env, stdio: 'inherit' });
+    if (live && result.status === 0) console.log('Now send one message to Capri that previously produced an empty reply. Wait for its answer or error, then the live diagnostic report is ready.');
     process.exitCode = result.status ?? 1;
   }
 }

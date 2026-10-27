@@ -11,6 +11,7 @@ const { randomUUID } = require('node:crypto');
 const { spawn, execFile } = require('node:child_process');
 const ollama = require('./ollama');
 const { readChatStream } = require('./chat-stream');
+let liveGroqCompared = false;
 
 const PROVIDERS = {
   ollama: { label: 'Ollama (local)', kind: 'ollama', local: true },
@@ -108,6 +109,12 @@ async function openaiChat(p, { model, messages }, onDelta, signal) {
         throw await failure(res);
       }
       const result = await readChatStream(res.body, (piece) => { text += piece; onDelta(piece); });
+      if (p.env === 'GROQ_API_KEY' && process.env.CAPRI_DIAGNOSE_GROQ === '1' && !liveGroqCompared) {
+        liveGroqCompared = true;
+        await require('./groq-diagnostic').compareLiveRequest(p, { model, messages: nextMessages },
+          { finishReason: result.finishReason, contentCharacters: result.text.length }, signal)
+          .catch(() => console.warn('[capri] Live Groq comparison could not be saved'));
+      }
       console.log(`[capri] chat finish=${result.finishReason || 'done'} characters=${result.text.length} part=${attempt + 1}`);
       if (!result.finishReason || result.finishReason === 'stop') {
         if (!text.trim()) throw new Error('Empty answer from the AI provider. Please try again or choose another AI model.');
