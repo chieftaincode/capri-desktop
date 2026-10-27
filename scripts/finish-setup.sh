@@ -45,14 +45,5 @@ elif command -v claude >/dev/null 2>&1; then
   node scripts/install-hooks.js
 fi
 echo 'Starting Capri. Restart your coding assistant so it loads the hooks.'
-mkdir -p .runtime
-nohup node scripts/start-linux.js > .runtime/capri.log 2>&1 < /dev/null &
-capri_launcher_pid=$!
-sleep 4
-if ! kill -0 "$capri_launcher_pid" 2>/dev/null; then
-  cat .runtime/capri.log
-  exit 1
-fi
-curl --fail --silent --show-error http://127.0.0.1:47823/health
-echo
+node scripts/restart-linux.js
 echo "Capri is running. Log: $capri_root/.runtime/capri.log"
