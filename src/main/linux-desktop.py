@@ -17,6 +17,41 @@ def emit(data):
     print(json.dumps(data, separators=(',', ':')), flush=True)
 
 
+def prepare_overlay(window_id, parent_pid):
+    """Set the overlay's role before KWin manages it, retaining keyboard focus.
+
+    KWin puts active fullscreen clients above ordinary keep-above windows. Its
+    critical-notification role is above that layer, with normal input hints.
+    These are properties of our own window, not persistent compositor rules.
+    """
+    from Xlib import Xatom, display
+    connection = display.Display()
+    try:
+        window = connection.create_resource_object('window', window_id)
+        owner = window.get_full_property(connection.intern_atom('_NET_WM_PID'), Xatom.CARDINAL)
+        if owner is None or len(owner.value) != 1 or int(owner.value[0]) != parent_pid:
+            raise RuntimeError('Refusing to change a window not owned by Capri')
+        kde = 'KDE' in os.environ.get('XDG_CURRENT_DESKTOP', '').upper()
+        if kde:
+            window.change_property(connection.intern_atom('_NET_WM_WINDOW_TYPE'), Xatom.ATOM, 32, [
+                connection.intern_atom('_KDE_NET_WM_WINDOW_TYPE_CRITICAL_NOTIFICATION'),
+                connection.intern_atom('_NET_WM_WINDOW_TYPE_NOTIFICATION'),
+            ])
+        state_atom = connection.intern_atom('_NET_WM_STATE')
+        previous = window.get_full_property(state_atom, Xatom.ATOM)
+        states = list(previous.value) if previous is not None else []
+        for name in ('_NET_WM_STATE_SKIP_TASKBAR', '_NET_WM_STATE_SKIP_PAGER', '_NET_WM_STATE_ABOVE'):
+            value = connection.intern_atom(name)
+            if value not in states:
+                states.append(value)
+        window.change_property(state_atom, Xatom.ATOM, 32, states)
+        # Do not set override_redirect or disable WM_HINTS.input: chat needs focus.
+        connection.sync()
+        emit({'ok': True, 'role': 'critical-notification' if kde else 'unchanged'})
+    finally:
+        connection.close()
+
+
 def kwin(parent_pid):
     import dbus
     import dbus.service
@@ -205,13 +240,16 @@ def x11(parent_pid):
 
 if __name__ == '__main__':
     try:
-        parent = int(sys.argv[1])
-        if 'KDE' in os.environ.get('XDG_CURRENT_DESKTOP', '').upper():
-            kwin(parent)
-        elif os.environ.get('XDG_SESSION_TYPE') == 'x11':
-            x11(parent)
+        if sys.argv[1] == '--prepare-overlay':
+            prepare_overlay(int(sys.argv[2]), int(sys.argv[3]))
         else:
-            raise RuntimeError('Window tracking requires KDE Plasma 6 or an X11 session')
+            parent = int(sys.argv[1])
+            if 'KDE' in os.environ.get('XDG_CURRENT_DESKTOP', '').upper():
+                kwin(parent)
+            elif os.environ.get('XDG_SESSION_TYPE') == 'x11':
+                x11(parent)
+            else:
+                raise RuntimeError('Window tracking requires KDE Plasma 6 or an X11 session')
     except Exception as exc:
         print('[capri] Linux desktop bridge: ' + str(exc), file=sys.stderr)
         sys.exit(1)

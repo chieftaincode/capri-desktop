@@ -13,6 +13,14 @@ const run = (file, args) => new Promise((resolve, reject) => {
 let child = null;
 let snapshot = null;
 
+async function prepareOverlay(overlay) {
+  const handle = overlay.getNativeWindowHandle();
+  const result = JSON.parse(await run('/usr/bin/python', [helper('linux-desktop.py'), '--prepare-overlay',
+    String(handle.readUInt32LE(0)), String(process.pid)]));
+  if (!result.ok) throw new Error('Overlay window hints were not applied');
+  console.log('[capri] overlay role:', result.role);
+}
+
 function startWindowWatch({ overlay, onUpdate }) {
   let stopped = false;
   let restarts = 0;
@@ -60,7 +68,7 @@ function startWindowWatch({ overlay, onUpdate }) {
 // KWin's cursor is in the same logical coordinates as its window geometries.
 function cursor() { return snapshot?.logical ? snapshot.cursor : null; }
 function status() { return { connected: Boolean(snapshot), backend: snapshot ? (snapshot.logical ? 'kwin' : 'x11') : null,
-  windows: snapshot?.wins?.length || 0 }; }
+  windows: snapshot?.wins?.length || 0, overlay: snapshot?.overlay || null }; }
 
 const KEEP = /^(?:kwin.*|plasmashell|ksmserver|kscreenlocker.*|kded.*|org\.kde\.plasmashell|capri.*|electron.*|claude.*|codex.*|ollama.*)$/i;
 function openApps() {
@@ -148,5 +156,5 @@ function setStartup(enabled, root) {
   fs.writeFileSync(startupFile(), desktopEntry(exe, args, icon));
 }
 
-module.exports = { startWindowWatch, cursor, status, openApps, closeApp, desktopApps, launchApp, epicGames, media,
+module.exports = { prepareOverlay, startWindowWatch, cursor, status, openApps, closeApp, desktopApps, launchApp, epicGames, media,
   desktopEntry, startupEnabled, setStartup };

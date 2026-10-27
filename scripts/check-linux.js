@@ -9,7 +9,7 @@ function check(label, file, args) {
   console.log(`${pass ? 'OK' : 'FAIL'} ${label}${pass ? '' : ': ' + (result.stderr?.trim() || result.error?.message || result.status)}`);
   ok &&= pass;
 }
-check('Python desktop dependencies', '/usr/bin/python', ['-c', 'import dbus, gi; from gi.repository import Gio, GLib']);
+check('Python desktop dependencies', '/usr/bin/python', ['-c', 'import dbus, gi, Xlib; from gi.repository import Gio, GLib']);
 check('KWin session access', 'qdbus6', ['org.kde.KWin', '/Scripting', 'org.kde.kwin.Scripting.isScriptLoaded', 'capri-diagnostic']);
 for (const file of ['/usr/bin/electron42', '/usr/bin/gtk-launch', '/usr/bin/wpctl']) {
   const pass = fs.existsSync(file);

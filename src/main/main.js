@@ -201,7 +201,12 @@ function createOverlay() {
   overlay.loadURL('capri://app/src/renderer/index.html');
   // always shown: put away, she's still there as her biochip in the corner. Sized again first:
   // Windows keeps a new window inside the work area, and resting on the taskbar it covers it too.
-  overlay.once('ready-to-show', () => {
+  overlay.once('ready-to-show', async () => {
+    if (linux) {
+      try { await linux.prepareOverlay(overlay); }
+      catch (err) { console.error('[capri] overlay role setup failed:', err.message); }
+      if (!overlay || overlay.isDestroyed()) return;
+    }
     fitOverlay();
     overlay.showInactive();
   });

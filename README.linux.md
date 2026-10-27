@@ -35,6 +35,7 @@ Die Logs liegen in `.runtime/setup.log` und `.runtime/capri.log`.
 | Aktives Fenster, Antworten bei Fokuswechsel, andere AIs erkennen | KWin meldet IDs und AI-Namensübereinstimmungen; Fenstertitel und Inhalte werden nicht übertragen |
 | Transparenz und Mausinteraktion | Electron läuft unter XWayland; Zeigerabfrage ersetzt die unter Linux fehlende Weiterleitung von Mausbewegungen |
 | Chat- und API-Key-Eingaben | Von Anfang an fokussierbares Linux-Fenster; nativer Fenster- und Web-Inhalt-Fokus beim Öffnen und erneuten Anklicken eines Eingabefelds |
+| Über Vollbildfenstern und ohne Taskleisteneintrag | Fenstereigene KDE-Overlay-Rolle vor dem ersten Anzeigen; KWin setzt zusätzlich `skipTaskbar`, `skipPager` und `skipSwitcher` |
 | Mehrere Bildschirme | Vorhandene Electron-Bildschirmsteuerung, KWin-Koordinaten und globaler Mauszeiger |
 | Anwendungen öffnen | Gio-Anwendungskatalog und `gtk-launch`, einschließlich registrierter Flatpak-Programme |
 | Anwendungen schließen | KWin sendet normales Schließen an die ausdrücklich ausgewählten Fenster; erzwungenes Beenden bleibt hinter der vorhandenen Bestätigung |
@@ -47,6 +48,11 @@ Die Logs liegen in `.runtime/setup.log` und `.runtime/capri.log`.
 
 Das KWin-Skript wird beim Start temporär geladen und beim Beenden entladen.
 Es verändert keine KWin-Regeln und installiert kein dauerhaft aktives Plugin.
+Für die Darstellung über aktiven Vollbildfenstern setzt Capri an ihrem eigenen
+XWayland-Fenster den KDE-Typ `CriticalNotification`. KWin ordnet diese Ebene über
+dem aktiven Vollbildfenster ein; gewöhnliches `keepAbove` liegt darunter.
+Die Eingabefähigkeit bleibt erhalten. Diese Eigenschaften verschwinden beim
+Schließen des Fensters und betreffen keine anderen Programme.
 Die Anbindung nutzt die [offizielle KWin-Scripting-API](https://develop.kde.org/docs/plasma/kwin/api/).
 Für X11 ohne KDE gibt es eine EWMH-Anbindung über Python-Xlib. Andere
 Wayland-Compositoren sind mit dieser Portierung nicht unterstützt.

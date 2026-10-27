@@ -17,11 +17,16 @@ function tick() {
   const stack = workspace.stackingOrder;
   const fg = workspace.activeWindow;
   const wins = [];
+  let overlay = null;
   for (let i = stack.length - 1; i >= 0; i--) {
     const w = stack[i];
     if (w.pid === selfPid && w.caption === 'Capri Desktop Overlay') {
+      w.skipTaskbar = true;
       w.skipSwitcher = true;
       w.skipPager = true;
+      w.keepAbove = true;
+      overlay = { skipTaskbar: Boolean(w.skipTaskbar), aboveFullscreen: Boolean(w.criticalNotification || w.onScreenDisplay),
+        layer: Number(w.layer) };
       continue;
     }
     if (!visible(w) || (!w.normalWindow && !w.dialog)) continue;
@@ -32,7 +37,7 @@ function tick() {
   }
   const data = { fg: fg ? String(fg.internalId) : null, taskbar: Boolean(fg && fg.dock),
     ai: fg ? rivals.filter(function (r) { return r[1].test(fg.caption + ' ' + fg.resourceClass); }).map(function (r) { return r[0]; }) : [],
-    wins: wins, logical: true, cursor: { x: workspace.cursorPos.x, y: workspace.cursorPos.y } };
+    wins: wins, logical: true, overlay: overlay, cursor: { x: workspace.cursorPos.x, y: workspace.cursorPos.y } };
   callDBus(service, '/Capri', 'org.capri.Desktop', 'Snapshot', JSON.stringify(data), function (reply) {
     if (typeof reply !== 'string') return; // bridge exited: stop instead of spinning on D-Bus errors
     try {

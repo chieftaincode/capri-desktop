@@ -19,7 +19,7 @@ function kwinSession() {
   const windows = [win('back'), win('max', { maximizeMode: 3 }), win('hidden', { minimized: true }),
     win('elsewhere', { desktops: [other] }), win('activity', { activities: ['other'] }),
     win('small', { frameGeometry: { x: 0, y: 0, width: 20, height: 20 } }),
-    win('overlay', { pid: 100, caption: 'Capri Desktop Overlay' }),
+    win('overlay', { pid: 100, caption: 'Capri Desktop Overlay', criticalNotification: true, layer: 7 }),
     win('demo', { pid: 100, caption: 'night-city-api — npm test' }),
     win('front', { caption: 'ChatGPT — private conversation' })];
   const workspace = { currentDesktop: desktop, currentActivity: 'default', stackingOrder: windows,
@@ -62,6 +62,17 @@ test('KWin refreshes when focus, desktop, geometry, and minimization change', ()
   workspace.currentDesktop = windows[3].desktops[0];
   callbacks.shift()('[]');
   assert.deepEqual(messages.at(-1).wins.map((w) => w.id), ['elsewhere']);
+});
+
+test('KWin hides Capri from the taskbar and switcher and reports its fullscreen layer', () => {
+  const { windows, messages } = kwinSession();
+  const overlay = windows.find((w) => w.internalId === 'overlay');
+  assert.equal(overlay.skipTaskbar, true);
+  assert.equal(overlay.skipSwitcher, true);
+  assert.equal(overlay.skipPager, true);
+  assert.equal(overlay.keepAbove, true);
+  assert.deepEqual(messages[0].overlay, { skipTaskbar: true, aboveFullscreen: true, layer: 7 });
+  assert.equal(windows[0].skipTaskbar, undefined, 'other applications must keep their taskbar entries');
 });
 
 test('KWin closes only explicitly named windows and never Capri itself', () => {

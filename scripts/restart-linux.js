@@ -39,13 +39,15 @@ async function main() {
   for (let i = 0; i < 100; i++) {
     await wait(150);
     const state = await health();
-    if (state?.desktop?.connected) {
+    const desktop = state?.desktop;
+    const overlayReady = desktop?.backend !== 'kwin' || (desktop.overlay?.skipTaskbar && desktop.overlay?.aboveFullscreen);
+    if (desktop?.connected && overlayReady) {
       console.log(JSON.stringify(state, null, 2));
       fs.writeFileSync(path.join(root, '.runtime/desktop-health.json'), JSON.stringify(state, null, 2) + '\n');
       return;
     }
   }
   console.error(fs.readFileSync(path.join(root, '.runtime/capri.log'), 'utf8'));
-  throw new Error('Capri started, but its desktop bridge did not connect');
+  throw new Error('Capri did not confirm a connected desktop bridge and fullscreen overlay role');
 }
 main().catch((err) => { console.error(err.message); process.exitCode = 1; });
