@@ -71,8 +71,19 @@ test('KWin hides Capri from the taskbar and switcher and reports its fullscreen 
   assert.equal(overlay.skipSwitcher, true);
   assert.equal(overlay.skipPager, true);
   assert.equal(overlay.keepAbove, true);
-  assert.deepEqual(messages[0].overlay, { skipTaskbar: true, aboveFullscreen: true, layer: 7 });
+  assert.deepEqual(messages[0].overlay, { skipTaskbar: true, aboveFullscreen: true, layer: 7,
+    geometry: { x: -1200, y: 140, width: 900, height: 600 } });
   assert.equal(windows[0].skipTaskbar, undefined, 'other applications must keep their taskbar entries');
+});
+
+test('Window ledges use the real KWin overlay origin on the left and right monitors', () => {
+  const viewport = { width: 1920, height: 1080 };
+  assert.deepEqual(linux.relativeRect({ x: -1700, y: 100, width: 800, height: 600 },
+    { x: -1920, y: 30, width: 1920, height: 1080 }, viewport), { x: 220, y: 70, w: 800, h: 600 });
+  assert.deepEqual(linux.relativeRect({ x: 2200, y: 100, width: 800, height: 600 },
+    { x: 1920, y: 30, width: 1920, height: 1080 }, viewport), { x: 280, y: 70, w: 800, h: 600 });
+  assert.deepEqual(linux.relativeRect({ x: 4400, y: 200, width: 1600, height: 1200 },
+    { x: 3840, y: 60, width: 3840, height: 2160 }, viewport), { x: 280, y: 70, w: 800, h: 600 });
 });
 
 test('KWin closes only explicitly named windows and never Capri itself', () => {

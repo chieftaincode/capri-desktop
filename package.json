@@ -62,7 +62,8 @@
       "src/main/windows.ps1",
       "src/main/linux-desktop.py",
       "src/main/linux-media.py",
-      "src/main/kwin.js"
+      "src/main/kwin.js",
+      "src/main/linux_input.py"
     ],
     "win": {
       "target": "nsis",

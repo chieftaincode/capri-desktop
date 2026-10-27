@@ -354,7 +354,7 @@ export class Capri {
 
   // Where her feet go so that her hips rest on the window's top edge.
   seat(win, dx) {
-    return { x: win.x + dx, y: win.y + 3 + (SPRITE.feet.y - SPRITE.hip) * this.scale };
+    return { x: win.x + dx, y: win.y + (win.seatOffset ?? 3) + (SPRITE.feet.y - SPRITE.hip) * this.scale };
   }
 
   canSit(win) {

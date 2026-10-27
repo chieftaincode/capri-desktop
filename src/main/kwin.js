@@ -26,7 +26,8 @@ function tick() {
       w.skipPager = true;
       w.keepAbove = true;
       overlay = { skipTaskbar: Boolean(w.skipTaskbar), aboveFullscreen: Boolean(w.criticalNotification || w.onScreenDisplay),
-        layer: Number(w.layer) };
+        layer: Number(w.layer), geometry: { x: w.frameGeometry.x, y: w.frameGeometry.y,
+          width: w.frameGeometry.width, height: w.frameGeometry.height } };
       continue;
     }
     if (!visible(w) || (!w.normalWindow && !w.dialog)) continue;

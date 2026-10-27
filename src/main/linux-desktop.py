@@ -52,11 +52,12 @@ def prepare_overlay(window_id, parent_pid):
         connection.close()
 
 
-def kwin(parent_pid):
+def kwin(parent_pid, window_id):
     import dbus
     import dbus.service
     from dbus.mainloop.glib import DBusGMainLoop
     from gi.repository import GLib
+    from linux_input import InputRegions
 
     DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
@@ -66,6 +67,9 @@ def kwin(parent_pid):
     commands = []
     last = None
     loop = GLib.MainLoop()
+    input_regions = InputRegions.open(window_id, parent_pid)
+    input_timer = GLib.timeout_add(50, input_regions.tick)
+    stdin_buffer = ''
 
     class Bridge(dbus.service.Object):
         @dbus.service.method('org.capri.Desktop', in_signature='s', out_signature='s',
@@ -77,6 +81,7 @@ def kwin(parent_pid):
                 return
             try:
                 data = json.loads(payload)
+                data['input'] = {'mode': 'shaped', 'rectangles': input_regions.count}
                 if payload != last:
                     emit(data)
                     last = payload
@@ -107,19 +112,25 @@ def kwin(parent_pid):
                            'org.kde.kwin.Script').run()
 
             def stdin_ready(source, condition):
+                nonlocal stdin_buffer
                 if condition & (GLib.IO_HUP | GLib.IO_ERR):
                     loop.quit()
                     return False
-                line = sys.stdin.readline()
-                if not line:
+                chunk = os.read(sys.stdin.fileno(), 65536)
+                if not chunk:
                     loop.quit()
                     return False
-                try:
-                    cmd = json.loads(line)
-                    if cmd.get('command') == 'close' and isinstance(cmd.get('ids'), list):
-                        commands.append({'command': 'close', 'ids': [str(i) for i in cmd['ids']][:100]})
-                except (ValueError, AttributeError):
-                    pass
+                stdin_buffer += chunk.decode('utf8')
+                while '\n' in stdin_buffer:
+                    line, stdin_buffer = stdin_buffer.split('\n', 1)
+                    try:
+                        cmd = json.loads(line)
+                        if cmd.get('command') == 'close' and isinstance(cmd.get('ids'), list):
+                            commands.append({'command': 'close', 'ids': [str(i) for i in cmd['ids']][:100]})
+                        elif cmd.get('command') == 'input-regions':
+                            input_regions.refresh(cmd.get('rects'), cmd.get('viewport'))
+                    except (ValueError, AttributeError):
+                        pass
                 return True
 
             GLib.io_add_watch(sys.stdin, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, stdin_ready)
@@ -134,6 +145,8 @@ def kwin(parent_pid):
                 GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, sig, lambda: (loop.quit(), False)[1])
             loop.run()
         finally:
+            GLib.source_remove(input_timer)
+            input_regions.close()
             try:
                 manager.unloadScript(plugin)
             except dbus.DBusException:
@@ -141,9 +154,12 @@ def kwin(parent_pid):
             bridge.remove_from_connection()
 
 
-def x11(parent_pid):
+def x11(parent_pid, window_id):
     import re
     from Xlib import X, display, protocol
+    from linux_input import InputRegions
+    input_regions = InputRegions.open(window_id, parent_pid)
+    stdin_buffer = ''
     d = display.Display()
     root = d.screen().root
     atoms = {}
@@ -212,30 +228,38 @@ def x11(parent_pid):
                 taskbar = d.intern_atom('_NET_WM_WINDOW_TYPE_DOCK') in prop(fg, '_NET_WM_WINDOW_TYPE', [])
             except Exception:
                 pass
-        data = {'fg': active, 'taskbar': taskbar, 'ai': ai, 'wins': wins, 'logical': False}
+        input_regions.tick()
+        data = {'fg': active, 'taskbar': taskbar, 'ai': ai, 'wins': wins, 'logical': False,
+                'input': {'mode': 'shaped', 'rectangles': input_regions.count}}
         snapshot = json.dumps(data)
         if snapshot != last:
             emit(data)
             last = snapshot
         import select
-        ready, _, _ = select.select([sys.stdin], [], [], 0.15)
+        ready, _, _ = select.select([sys.stdin], [], [], 0.05)
         if ready:
-            line = sys.stdin.readline()
-            if not line:
+            chunk = os.read(sys.stdin.fileno(), 65536)
+            if not chunk:
                 break
-            try:
-                cmd = json.loads(line)
-                valid = {w['id'] for w in wins}
-                if cmd.get('command') == 'close':
-                    for wid in cmd.get('ids', []):
-                        if wid not in valid:
-                            continue
-                        event = protocol.event.ClientMessage(window=int(wid),
-                            client_type=d.intern_atom('_NET_CLOSE_WINDOW'), data=(32, [0, 2, 0, 0, 0]))
-                        root.send_event(event, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
-                    d.flush()
-            except (ValueError, TypeError):
-                pass
+            stdin_buffer += chunk.decode('utf8')
+            while '\n' in stdin_buffer:
+                line, stdin_buffer = stdin_buffer.split('\n', 1)
+                try:
+                    cmd = json.loads(line)
+                    valid = {w['id'] for w in wins}
+                    if cmd.get('command') == 'input-regions':
+                        input_regions.refresh(cmd.get('rects'), cmd.get('viewport'))
+                    elif cmd.get('command') == 'close':
+                        for wid in cmd.get('ids', []):
+                            if wid not in valid:
+                                continue
+                            event = protocol.event.ClientMessage(window=int(wid),
+                                client_type=d.intern_atom('_NET_CLOSE_WINDOW'), data=(32, [0, 2, 0, 0, 0]))
+                            root.send_event(event, event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask)
+                        d.flush()
+                except (ValueError, TypeError):
+                    pass
+    input_regions.close()
 
 
 if __name__ == '__main__':
@@ -245,9 +269,9 @@ if __name__ == '__main__':
         else:
             parent = int(sys.argv[1])
             if 'KDE' in os.environ.get('XDG_CURRENT_DESKTOP', '').upper():
-                kwin(parent)
+                kwin(parent, int(sys.argv[2]))
             elif os.environ.get('XDG_SESSION_TYPE') == 'x11':
-                x11(parent)
+                x11(parent, int(sys.argv[2]))
             else:
                 raise RuntimeError('Window tracking requires KDE Plasma 6 or an X11 session')
     except Exception as exc:

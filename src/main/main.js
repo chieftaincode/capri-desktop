@@ -145,6 +145,11 @@ function fitOverlay() {
 // clicked anymore. Off then on puts in a new one; her place on top and her size are set again too.
 function rearmOverlay() {
   if (!overlay || overlay.isDestroyed()) return;
+  if (linux) {
+    fitOverlay();
+    sendCommand('rearmed');
+    return;
+  }
   overlay.setIgnoreMouseEvents(false);
   overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.setAlwaysOnTop(true, 'screen-saver');
@@ -195,6 +200,12 @@ function createOverlay() {
 
   overlay.on('page-title-updated', (event) => event.preventDefault());
   overlay.on('focus', () => overlay?.webContents.send('overlay:focused'));
+  if (linux) {
+    // Electron 42 can reset X11 input hints on a move/resize. Start empty and
+    // let the bounded native input shape restore only Capri and her controls.
+    overlay.on('move', () => overlay?.setIgnoreMouseEvents(true));
+    overlay.on('resize', () => overlay?.setIgnoreMouseEvents(true));
+  }
   if (linux) overlay.setVisibleOnAllWorkspaces(true);
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
@@ -577,14 +588,17 @@ function createTray() {
 
 function registerIpc() {
   ipcMain.on('overlay:interactive', (_e, on) => {
+    if (linux) return; // Linux uses a native input shape, never a full-window hit area.
     overlay?.setIgnoreMouseEvents(!on, { forward: true });
   });
+  ipcMain.on('overlay:input-regions', (_e, data) => linux?.setInputRegions(data));
   ipcMain.on('overlay:rearm', () => rearmOverlay()); // the pointer moved over her and she never heard of it
   ipcMain.handle('overlay:cursor', () => {
     const p = linux?.cursor() || screen.getCursorScreenPoint();
-    const b = overlay.getBounds();
+    const b = linux?.overlayBounds(overlay) || overlay.getBounds();
+    const view = overlay.getBounds();
     const inside = p.x >= b.x && p.y >= b.y && p.x < b.x + b.width && p.y < b.y + b.height;
-    return { x: p.x - b.x, y: p.y - b.y, inside, display: displayAt(p).id };
+    return { x: (p.x - b.x) * view.width / b.width, y: (p.y - b.y) * view.height / b.height, inside, display: displayAt(p).id };
   });
   // your screens (their bounds), the one she's on, and where her window is
   ipcMain.handle('screens:list', () => {

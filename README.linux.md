@@ -33,7 +33,7 @@ Die Logs liegen in `.runtime/setup.log` und `.runtime/capri.log`.
 | --- | --- |
 | Auf Fenstern sitzen, mitfahren, fallen, Fenster-Effekte | Temporäres KWin-6-Skript für native Wayland- und X11-Fenster, inklusive Stapelreihenfolge, Arbeitsflächen und Aktivitäten |
 | Aktives Fenster, Antworten bei Fokuswechsel, andere AIs erkennen | KWin meldet IDs und AI-Namensübereinstimmungen; Fenstertitel und Inhalte werden nicht übertragen |
-| Transparenz und Mausinteraktion | Electron läuft unter XWayland; Zeigerabfrage ersetzt die unter Linux fehlende Weiterleitung von Mausbewegungen |
+| Transparenz und Mausinteraktion | Electron läuft unter XWayland; eine X11-Eingabeform umfasst nur Figur und Bedienelemente, die übrige Desktopfläche bleibt durchlässig |
 | Chat- und API-Key-Eingaben | Von Anfang an fokussierbares Linux-Fenster; nativer Fenster- und Web-Inhalt-Fokus beim Öffnen und erneuten Anklicken eines Eingabefelds |
 | Über Vollbildfenstern und ohne Taskleisteneintrag | Fenstereigene KDE-Overlay-Rolle vor dem ersten Anzeigen; KWin setzt zusätzlich `skipTaskbar`, `skipPager` und `skipSwitcher` |
 | Mehrere Bildschirme | Vorhandene Electron-Bildschirmsteuerung, KWin-Koordinaten und globaler Mauszeiger |
@@ -53,6 +53,11 @@ XWayland-Fenster den KDE-Typ `CriticalNotification`. KWin ordnet diese Ebene üb
 dem aktiven Vollbildfenster ein; gewöhnliches `keepAbove` liegt darunter.
 Die Eingabefähigkeit bleibt erhalten. Diese Eigenschaften verschwinden beim
 Schließen des Fensters und betreffen keine anderen Programme.
+Die Eingabeform wird regelmäßig erneuert und bei ausbleibenden Aktualisierungen
+nach einer halben Sekunde geleert. Auch beim Ziehen wird kein bildschirmweiter
+Eingabebereich eingeschaltet. KWin-Fensterkanten und Mauszeiger werden relativ zur
+tatsächlichen Overlay-Geometrie berechnet, einschließlich Bildschirmwechsel und
+unterschiedlicher Skalierung.
 Die Anbindung nutzt die [offizielle KWin-Scripting-API](https://develop.kde.org/docs/plasma/kwin/api/).
 Für X11 ohne KDE gibt es eine EWMH-Anbindung über Python-Xlib. Andere
 Wayland-Compositoren sind mit dieser Portierung nicht unterstützt.

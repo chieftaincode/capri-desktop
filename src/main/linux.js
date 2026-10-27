@@ -13,6 +13,23 @@ const run = (file, args) => new Promise((resolve, reject) => {
 let child = null;
 let snapshot = null;
 
+function relativeRect(rect, origin, viewport) {
+  const sx = viewport.width / origin.width, sy = viewport.height / origin.height;
+  return { x: (rect.x - origin.x) * sx, y: (rect.y - origin.y) * sy,
+    w: rect.width * sx, h: rect.height * sy };
+}
+
+function overlayBounds(overlay) {
+  const b = snapshot?.logical && snapshot?.overlay?.geometry;
+  return b && b.width > 0 && b.height > 0 ? b : overlay.getBounds();
+}
+
+function setInputRegions(data) {
+  if (!child?.stdin.writable || child.stdin.writableLength > 128 * 1024) return;
+  if (!Array.isArray(data?.rects) || data.rects.length > 1024 || !Array.isArray(data.viewport)) return;
+  child.stdin.write(JSON.stringify({ command: 'input-regions', rects: data.rects, viewport: data.viewport }) + '\n');
+}
+
 async function prepareOverlay(overlay) {
   const handle = overlay.getNativeWindowHandle();
   const result = JSON.parse(await run('/usr/bin/python', [helper('linux-desktop.py'), '--prepare-overlay',
@@ -28,6 +45,7 @@ function startWindowWatch({ overlay, onUpdate }) {
   const send = () => {
     if (!snapshot || overlay.isDestroyed()) return;
     const b = overlay.getBounds();
+    const origin = overlayBounds(overlay);
     const { screen } = require('electron');
     const wins = snapshot.wins.map((w) => {
       let r = { x: w.x, y: w.y, width: w.w, height: w.h };
@@ -36,12 +54,13 @@ function startWindowWatch({ overlay, onUpdate }) {
         const scale = screen.getDisplayNearestPoint(p).scaleFactor || 1;
         r = { x: p.x, y: p.y, width: w.w / scale, height: w.h / scale };
       }
-      return { id: w.id, x: r.x - b.x, y: r.y - b.y, w: r.width, h: r.height, max: w.max };
+      return { id: w.id, ...relativeRect(r, origin, b), max: w.max, seatOffset: -1 };
     }).filter((w) => w.x < b.width && w.x + w.w > 0 && w.y < b.height && w.y + w.h > 0);
     onUpdate({ fg: snapshot.fg, taskbar: Boolean(snapshot.taskbar), ai: snapshot.ai || [], wins });
   };
   const start = () => {
-    child = spawn('/usr/bin/python', [helper('linux-desktop.py'), String(process.pid)], { stdio: ['pipe', 'pipe', 'pipe'] });
+    child = spawn('/usr/bin/python', [helper('linux-desktop.py'), String(process.pid),
+      String(overlay.getNativeWindowHandle().readUInt32LE(0))], { stdio: ['pipe', 'pipe', 'pipe'] });
     child.stdin.on('error', () => {});
     readline.createInterface({ input: child.stdout }).on('line', (line) => {
       try {
@@ -68,7 +87,7 @@ function startWindowWatch({ overlay, onUpdate }) {
 // KWin's cursor is in the same logical coordinates as its window geometries.
 function cursor() { return snapshot?.logical ? snapshot.cursor : null; }
 function status() { return { connected: Boolean(snapshot), backend: snapshot ? (snapshot.logical ? 'kwin' : 'x11') : null,
-  windows: snapshot?.wins?.length || 0, overlay: snapshot?.overlay || null }; }
+  windows: snapshot?.wins?.length || 0, overlay: snapshot?.overlay || null, input: snapshot?.input || null }; }
 
 const KEEP = /^(?:kwin.*|plasmashell|ksmserver|kscreenlocker.*|kded.*|org\.kde\.plasmashell|capri.*|electron.*|claude.*|codex.*|ollama.*)$/i;
 function openApps() {
@@ -156,5 +175,5 @@ function setStartup(enabled, root) {
   fs.writeFileSync(startupFile(), desktopEntry(exe, args, icon));
 }
 
-module.exports = { prepareOverlay, startWindowWatch, cursor, status, openApps, closeApp, desktopApps, launchApp, epicGames, media,
+module.exports = { prepareOverlay, startWindowWatch, cursor, status, overlayBounds, relativeRect, setInputRegions, openApps, closeApp, desktopApps, launchApp, epicGames, media,
   desktopEntry, startupEnabled, setStartup };

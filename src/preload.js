@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('host', {
   onResize: on('overlay:resize'),
   onWindows: on('windows:update'),
   setInteractive: (on) => ipcRenderer.send('overlay:interactive', Boolean(on)),
+  setInputRegions: (rects, viewport) => ipcRenderer.send('overlay:input-regions', { rects, viewport }),
   rearm: () => ipcRenderer.send('overlay:rearm'),
   cursor: () => ipcRenderer.invoke('overlay:cursor'),
   screens: () => ipcRenderer.invoke('screens:list'),

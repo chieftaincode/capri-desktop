@@ -11,6 +11,9 @@ from unittest.mock import patch
 spec = importlib.util.spec_from_file_location('capri_desktop', Path(__file__).parents[1] / 'src/main/linux-desktop.py')
 desktop = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(desktop)
+input_spec = importlib.util.spec_from_file_location('capri_input', Path(__file__).parents[1] / 'src/main/linux_input.py')
+input_module = importlib.util.module_from_spec(input_spec)
+input_spec.loader.exec_module(input_module)
 
 
 class Connection:
@@ -75,6 +78,40 @@ class OverlayTests(unittest.TestCase):
             self.prepare(connection, 'KDE')
         self.assertEqual(connection.properties, before)
         self.assertTrue(connection.closed)
+
+
+class InputShapeTests(unittest.TestCase):
+    def setUp(self):
+        self.now = 1.0
+        self.applied = []
+        self.shape = input_module.InputRegions(self.applied.append, lambda: (3840, 2160), clock=lambda: self.now)
+
+    def test_starts_click_through_and_scales_only_the_character_and_controls(self):
+        self.assertEqual(self.applied[-1], [])
+        self.shape.refresh([[20, 30, 40, 60], [500, 300, 200, 100]], [1920, 1080])
+        self.shape.tick()
+        self.assertEqual(self.applied[-1], [(40, 60, 80, 120), (1000, 600, 400, 200)])
+
+    def test_renderer_failure_releases_all_clicks_after_half_a_second(self):
+        self.shape.refresh([[20, 30, 40, 60]], [1920, 1080])
+        self.shape.tick()
+        self.now += 0.51
+        self.shape.tick()
+        self.assertEqual(self.applied[-1], [])
+
+    def test_whole_screen_nan_and_outside_rectangles_are_never_applied(self):
+        self.shape.refresh([[0, 0, 1920, 1080], [float('nan'), 0, 5, 5], [5000, 3000, 20, 20]], [1920, 1080])
+        self.shape.tick()
+        self.assertEqual(self.applied[-1], [])
+
+    def test_shape_is_local_to_its_window_when_the_overlay_changes_monitors(self):
+        self.shape.refresh([[15, 25, 30, 50]], [1920, 1080])
+        self.shape.tick()
+        self.assertEqual(self.applied[-1], [(30, 50, 60, 100)])
+        self.shape.geometry = lambda: (1920, 1080)
+        self.shape.refresh([[15, 25, 30, 50]], [1920, 1080])
+        self.shape.tick()
+        self.assertEqual(self.applied[-1], [(15, 25, 30, 50)])
 
 
 if __name__ == '__main__':

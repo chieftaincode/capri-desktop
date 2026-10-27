@@ -41,13 +41,13 @@ async function main() {
     const state = await health();
     const desktop = state?.desktop;
     const overlayReady = desktop?.backend !== 'kwin' || (desktop.overlay?.skipTaskbar && desktop.overlay?.aboveFullscreen);
-    if (desktop?.connected && overlayReady) {
+    if (desktop?.connected && overlayReady && desktop.input?.mode === 'shaped') {
       console.log(JSON.stringify(state, null, 2));
       fs.writeFileSync(path.join(root, '.runtime/desktop-health.json'), JSON.stringify(state, null, 2) + '\n');
       return;
     }
   }
   console.error(fs.readFileSync(path.join(root, '.runtime/capri.log'), 'utf8'));
-  throw new Error('Capri did not confirm a connected desktop bridge and fullscreen overlay role');
+  throw new Error('Capri did not confirm its desktop bridge, fullscreen role, and bounded input shape');
 }
 main().catch((err) => { console.error(err.message); process.exitCode = 1; });

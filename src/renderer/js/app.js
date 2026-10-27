@@ -11,6 +11,7 @@ import { Setup } from './setup.js';
 import { Custom } from './custom.js';
 import { Bond, Jealousy } from './bond.js';
 import { Reminders, clock } from './reminders.js';
+import { inputRegions } from './input-regions.js';
 import { linesFor } from './lines.js';
 import { pick, fmt, reducedMotion } from './util.js';
 
@@ -105,7 +106,7 @@ async function boot() {
   const setInteractive = (on) => {
     if (on === interactive) return;
     interactive = on;
-    host.setInteractive(on);
+    if (config.platform !== 'linux') host.setInteractive(on);
   };
   const onChip = () => Boolean(chip.visible && mouse && chip.contains(mouse.x, mouse.y, 0));
   const refreshHit = () => {
@@ -167,6 +168,7 @@ async function boot() {
       if (pending) return;
       pending = true;
       try {
+        host.setInputRegions(inputRegions({ capri, panel, chip, width: innerWidth, height: innerHeight }), [innerWidth, innerHeight]);
         const at = await host.cursor();
         const next = at?.inside ? { x: at.x, y: at.y } : null;
         if (next && (!mouse || next.x !== mouse.x || next.y !== mouse.y)) {
