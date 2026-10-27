@@ -10,6 +10,7 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { spawn, execFile } = require('node:child_process');
 const ollama = require('./ollama');
+const { readChatStream } = require('./chat-stream');
 
 const PROVIDERS = {
   ollama: { label: 'Ollama (local)', kind: 'ollama', local: true },
@@ -89,35 +90,33 @@ function warm(id, model) {
 
 // OpenAI-style streaming (server-sent events): onDelta(piece) as it comes, resolves with all of it.
 async function openaiChat(p, { model, messages }, onDelta, signal) {
-  const res = await fetch(`${p.url}/chat/completions`, {
-    method: 'POST',
-    headers: headers(p.key),
-    body: JSON.stringify({ model, messages, stream: true }),
-    signal,
-  });
-  if (!res.ok) throw await failure(res);
-  const decoder = new TextDecoder();
-  let buffer = '';
   let text = '';
-  for await (const chunk of res.body) {
-    buffer += decoder.decode(chunk, { stream: true });
-    let nl;
-    while ((nl = buffer.indexOf('\n')) >= 0) {
-      const line = buffer.slice(0, nl).trim();
-      buffer = buffer.slice(nl + 1);
-      if (!line.startsWith('data:')) continue;
-      const data = line.slice(5).trim();
-      if (data === '[DONE]') return text;
-      const msg = JSON.parse(data);
-      if (msg.error) throw new Error(msg.error.message || msg.error);
-      const piece = msg.choices?.[0]?.delta?.content || ''; // reasoning comes apart, and is left out
-      if (piece) {
-        text += piece;
-        onDelta(piece);
-      }
+  let nextMessages = messages;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      signal?.throwIfAborted();
+      const res = await fetch(`${p.url}/chat/completions`, {
+        method: 'POST',
+        headers: headers(p.key),
+        body: JSON.stringify({ model, messages: nextMessages, stream: true,
+          ...(p.env === 'GROQ_API_KEY' ? { max_completion_tokens: 4096 } : {}) }),
+        signal,
+      });
+      if (!res.ok) throw await failure(res);
+      const result = await readChatStream(res.body, (piece) => { text += piece; onDelta(piece); });
+      console.log(`[capri] chat finish=${result.finishReason || 'done'} characters=${result.text.length} part=${attempt + 1}`);
+      if (!result.finishReason || result.finishReason === 'stop') return text;
+      if (result.finishReason !== 'length') throw new Error(`The provider ended this answer (${result.finishReason}).`);
+      if (attempt === 2 || !result.text.trim()) throw new Error('The answer reached the provider limit. Please ask for a shorter answer.');
+      // Only a confirmed token limit triggers a continuation, never punctuation guesses.
+      nextMessages = [...messages, { role: 'assistant', content: text },
+        { role: 'user', content: 'Continue exactly where your answer was cut off. Do not repeat the beginning. Finish the answer briefly, in the same language.' }];
+    } catch (err) {
+      err.partialText = text;
+      console.warn(`[capri] chat incomplete characters=${text.length} part=${attempt + 1}`);
+      throw err;
     }
   }
-  return text;
 }
 
 // --- Claude Code ---------------------------------------------------------------------------------

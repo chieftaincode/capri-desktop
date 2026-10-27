@@ -244,7 +244,9 @@ export class Chat {
       this.history.pop();
       this.panel.setFace('wide');
       // too busy or gone even after trying other models (main.js): said plainly, not the server's JSON
-      this.panel.stream(res.code === 'busy' ? this.t.swamped : res.code === 'gone' ? this.t.gone : `${this.t.failed} ${res.error}`, { done: true });
+      const error = res.code === 'busy' ? this.t.swamped : res.code === 'gone' ? this.t.gone : `${this.t.failed} ${res.error}`;
+      const partial = clean(res.partialText || '');
+      this.panel.stream(partial ? `${partial}\n\n[${error}]` : error, { done: true });
       this.panel.setChatBusy(false);
       return;
     }

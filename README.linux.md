@@ -45,6 +45,15 @@ Groq bleibt als Chat-Anbieter erhalten. Vorhandene Codex-Hooks bleiben installie
 im Capri-Menü kann zwischen den beobachteten Assistenten gewechselt werden.
 Capri beobachtet jeweils den ausgewählten Assistenten.
 
+## Abgeschnittene Chatantworten
+
+Die Streaming-Anbindung verarbeitet auch die letzte Datenzeile ohne abschließenden
+Zeilenumbruch und erkennt Verbindungsabbrüche. Meldet ein kompatibler Chat-Anbieter
+ausdrücklich ein Tokenlimit, wird die Antwort höchstens zweimal fortgesetzt.
+Groq erhält ein Ausgabelimit von 4096 Tokens pro Teilantwort. Bei Fehlern bleibt
+der empfangene Text mit einem Fehlerhinweis sichtbar. Im Laufzeitlog stehen nur
+Abschlussgrund und Zeichenanzahl, keine Antworttexte oder Zugangsdaten.
+
 ## Änderungen
 
 | Funktion | Linux-Anbindung |

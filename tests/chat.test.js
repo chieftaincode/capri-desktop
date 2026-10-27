@@ -25,6 +25,28 @@ async function loadChat() {
 }
 const chatModule = loadChat();
 
+test('Interrupted answers remain visible with an error, unlock input, and trigger no actions', async () => {
+  const { Chat } = await chatModule;
+  let displayed = '', actions = 0;
+  const panel = {
+    chatInput: { disabled: false },
+    setChatBusy(on) { this.chatInput.disabled = on; },
+    setActions() {}, chatTurn() {}, setFace() {},
+    stream(text) { displayed = text; },
+  };
+  const host = { onChatDelta() {}, chatSend: async () => ({ ok: false, partialText: 'An unfinished reply', error: 'Connection lost' }) };
+  const chat = new Chat({ panel, host, capri: { pulse() {} }, brain: { t: { chat: { failed: 'Lost the signal:' } } } });
+  chat.open = true;
+  chat.persona = () => 'You are Capri.';
+  chat.asked = () => null;
+  chat.after = () => { actions++; };
+  await chat.send('Hello');
+  assert.match(displayed, /^An unfinished reply\n\n\[Lost the signal: Connection lost\]$/);
+  assert.equal(panel.chatInput.disabled, false);
+  assert.equal(actions, 0);
+  assert.equal(chat.history.length, 0, 'an incomplete answer must not be remembered as successful');
+});
+
 for (const mode of ['cloud with mood', 'cloud without mood', 'agent']) {
   test(`Chat unlocks input after each answer and accepts a second message: ${mode}`, async () => {
     const { Chat } = await chatModule;

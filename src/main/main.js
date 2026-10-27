@@ -653,7 +653,7 @@ function registerIpc() {
       if (cfg.provider === 'claude') saveMemory({ claude: llm.claudeMemory() });
       return { ok: true, text };
     } catch (err) {
-      return { ok: false, error: abort.signal.aborted ? 'stopped' : err.message, code: err.code || null };
+      return { ok: false, error: abort.signal.aborted ? 'stopped' : err.message, code: err.code || null, partialText: err.partialText || '' };
     } finally {
       chats.delete(id);
     }
