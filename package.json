@@ -7,8 +7,8 @@
   "main": "src/main/main.js",
   "private": true,
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev",
+    "start": "node scripts/start.js",
+    "dev": "node scripts/start.js --dev",
     "demo": "node scripts/demo.js",
     "hooks:install": "node scripts/install-hooks.js",
     "hooks:uninstall": "node scripts/install-hooks.js --uninstall",
@@ -18,7 +18,14 @@
     "hooks:agy:uninstall": "node scripts/install-hooks-agy.js --uninstall",
     "check:llm": "node scripts/check-llm.js",
     "test:hooks": "node --test tests/hooks.test.js",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win",
+    "start:linux": "node scripts/start-linux.js",
+    "dev:linux": "node scripts/start-linux.js --dev",
+    "install:linux": "node scripts/install-linux.js",
+    "check:linux": "node scripts/check-linux.js",
+    "test": "node --test tests/*.test.js",
+    "test:linux": "node --test tests/linux.test.js",
+    "dist:linux": "electron-builder --linux dir --config.electronDist=/usr/lib/electron42 --config.electronVersion=42.11.18"
   },
   "keywords": [
     "claude-code",
@@ -52,7 +59,10 @@
     ],
     "asarUnpack": [
       "hooks/**",
-      "src/main/windows.ps1"
+      "src/main/windows.ps1",
+      "src/main/linux-desktop.py",
+      "src/main/linux-media.py",
+      "src/main/kwin.js"
     ],
     "win": {
       "target": "nsis",
@@ -65,6 +75,20 @@
       "createDesktopShortcut": true,
       "shortcutName": "Capri",
       "artifactName": "Capri-Setup-${version}.${ext}"
-    }
+    },
+    "linux": {
+      "target": [
+        "dir"
+      ],
+      "category": "Utility",
+      "executableName": "capri",
+      "icon": "assets/icons/capri.png"
+    },
+    "extraResources": [
+      {
+        "from": "assets/icons/capri.png",
+        "to": "capri.png"
+      }
+    ]
   }
 }

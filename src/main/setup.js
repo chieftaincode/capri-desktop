@@ -53,6 +53,7 @@ async function ollamaState() {
 
 // Installs Ollama with winget (Windows' own package manager); onLine(text) for what it prints.
 function installOllama(onLine) {
+  if (!WIN) return Promise.resolve({ ok: false, error: 'Install Ollama with your system package manager (Arch: sudo pacman -S ollama), then choose Start Ollama.' });
   return new Promise((resolve) => {
     const child = spawn('winget', [
       'install', '--id', 'Ollama.Ollama', '--exact', '--silent',
@@ -118,7 +119,14 @@ async function pullModel(name, onProgress, signal) {
 // Claude Code (or Codex) through Ollama, in a window of its own: Ollama fetches what's missing and
 // asks which model to use. She sees it like any other session, through her hooks.
 function launchThroughOllama(integration) {
-  if (!WIN || !['claude', 'codex'].includes(integration)) return { ok: false };
+  if (!['claude', 'codex'].includes(integration)) return { ok: false };
+  if (process.platform === 'linux') {
+    const child = spawn('konsole', ['--hold', '-e', 'ollama', 'launch', integration], { detached: true, stdio: 'ignore' });
+    child.on('error', () => {});
+    child.unref();
+    return { ok: true };
+  }
+  if (!WIN) return { ok: false };
   const { cli } = ollamaFiles();
   // `start` opens a new console window (its first quoted argument is the window's title); cmd /k
   // strips the outer quotes of what follows, so a path with spaces in it keeps its own

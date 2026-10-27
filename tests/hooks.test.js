@@ -106,11 +106,14 @@ test('hook exits silently when Capri is unavailable', async () => {
   await invoke('capri-codex-hook.js', JSON.stringify({ hook_event_name: 'Stop' }), port);
 });
 
-test('Codex onboarding, guide, and chat use Codex in every language; Claude text is preserved', async () => {
+test('Codex onboarding, guide, and chat use Codex in every language; Claude text is preserved', async (t) => {
+  const previousMatchMedia = globalThis.matchMedia;
+  globalThis.matchMedia = () => ({ matches: false });
+  t.after(() => { if (previousMatchMedia) globalThis.matchMedia = previousMatchMedia; else delete globalThis.matchMedia; });
   const { LINES, linesFor } = await import(moduleUrl(path.join(__dirname, '../src/renderer/js/lines.js')));
   const { Guide } = await import(moduleUrl(path.join(__dirname, '../src/renderer/js/guide.js')));
   const { Chat } = await import(moduleUrl(path.join(__dirname, '../src/renderer/js/chat.js')));
-  const strings = (value) => typeof value === 'string' ? [value] : Object.values(value).flatMap(strings);
+  const strings = (value) => typeof value === 'string' ? [value] : value == null ? [] : Object.values(value).flatMap(strings);
   for (const lang of Object.keys(LINES)) {
     const text = linesFor(lang, 'codex');
     assert.doesNotMatch(strings(text).join('\n'), /Claude|settings\.json|\.claude/);

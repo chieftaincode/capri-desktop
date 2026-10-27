@@ -17,6 +17,7 @@ const llm = require('./llm');
 const setup = require('./setup');
 const apps = require('./apps');
 const launch = require('./launch');
+const linux = process.platform === 'linux' ? require('./linux') : null;
 const { ASSISTANTS, assistant } = require('./assistants');
 const activeAssistant = () => assistant(config.load().assistant); // Claude Code or Codex
 const activeHooks = () => activeAssistant().hooks;
@@ -165,6 +166,7 @@ function raiseOverlay() {
 
 function createOverlay() {
   overlay = new BrowserWindow({
+    title: 'Capri Desktop Overlay',
     ...overlayArea().area,
     transparent: true,
     backgroundColor: '#00000000',
@@ -190,6 +192,7 @@ function createOverlay() {
     },
   });
 
+  overlay.on('page-title-updated', (event) => event.preventDefault());
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.setIgnoreMouseEvents(true, { forward: true });
   overlay.loadURL('capri://app/src/renderer/index.html');
@@ -250,7 +253,7 @@ const DEMO_TERMINAL = `<body style="margin:0;background:#14101c;color:#8f8aa3;fo
 function demoWindow(open) {
   demoWin?.destroy();
   demoWin = null;
-  if (!open || process.platform !== 'win32') return false;
+  if (!open) return false;
   const b = overlay.getBounds();
   demoWin = new BrowserWindow({
     x: Math.round(b.x + b.width * 0.5 - 310), y: Math.round(b.y + b.height * 0.42), width: 620, height: 300,
@@ -276,7 +279,7 @@ function resolveLang(setting) {
 // What the overlay gets: `lang` is the resolved one, `langSetting` what the user picked.
 function rendererConfig() {
   const { apiKeys, ...cfg } = config.load(); // the keys stay here: the overlay only learns which ones are set
-  return { ...cfg, keys: Object.keys(apiKeys || {}), assistant: activeAssistant().id, lang: resolveLang(cfg.lang), langSetting: cfg.lang, floorGap: overlayArea().gap };
+  return { ...cfg, platform: process.platform, keys: Object.keys(apiKeys || {}), assistant: activeAssistant().id, lang: resolveLang(cfg.lang), langSetting: cfg.lang, floorGap: overlayArea().gap };
 }
 
 function updateConfig(patch) {
@@ -450,10 +453,11 @@ function rebuildTray() {
       })),
     },
     {
-      label: t.startup,
+      label: linux ? 'Start at login' : t.startup,
       type: 'checkbox',
-      checked: app.getLoginItemSettings(loginItemOptions()).openAtLogin,
-      click: (item) => app.setLoginItemSettings({ ...loginItemOptions(), openAtLogin: item.checked }),
+      checked: linux ? linux.startupEnabled() : app.getLoginItemSettings(loginItemOptions()).openAtLogin,
+      click: (item) => linux ? linux.setStartup(item.checked, ROOT)
+        : app.setLoginItemSettings({ ...loginItemOptions(), openAtLogin: item.checked }),
     },
     // her hooks, while she watches Claude Code
     ...(cfg.claude ? [
@@ -569,7 +573,7 @@ function registerIpc() {
   });
   ipcMain.on('overlay:rearm', () => rearmOverlay()); // the pointer moved over her and she never heard of it
   ipcMain.handle('overlay:cursor', () => {
-    const p = screen.getCursorScreenPoint();
+    const p = linux?.cursor() || screen.getCursorScreenPoint();
     const b = overlay.getBounds();
     const inside = p.x >= b.x && p.y >= b.y && p.x < b.x + b.width && p.y < b.y + b.height;
     return { x: p.x - b.x, y: p.y - b.y, inside, display: displayAt(p).id };
@@ -705,8 +709,10 @@ function registerIpc() {
   ipcMain.handle('panel:copy', async (_e, rect) => {
     const image = await overlay.webContents.capturePage(rect);
     if (image.isEmpty()) return false;
-    const png = new Blob([image.toPNG()], { type: 'image/png' });
-    await clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    if (ClipboardItem) {
+      const png = new Blob([image.toPNG()], { type: 'image/png' });
+      await clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    } else clipboard.writeImage(image);
     return true;
   });
   // her guide: where her tray icon is (it lives in the taskbar, off the overlay, hence overlay
@@ -852,6 +858,9 @@ function applyRender() {
 }
 
 function main() {
+  // XWayland provides transparent, positioned, click-through overlays even in a
+  // Wayland session. KWin still supplies native Wayland window geometries.
+  if (linux) app.commandLine.appendSwitch('ozone-platform', 'x11');
   applyRender();
   if (!app.requestSingleInstanceLock()) {
     app.quit();

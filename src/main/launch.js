@@ -6,6 +6,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawn, execFile } = require('node:child_process');
 const { shell } = require('electron');
 const { powershell } = require('./apps');
@@ -26,6 +27,21 @@ const words = (text) => plain(text).split(/[^\p{L}\p{N}]+/u).filter((w) => w.len
 // Everything she can open: [{ name, kind: 'app' | 'steam' | 'epic', id }]
 async function launchables() {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.items;
+  if (process.platform === 'linux') {
+    const roots = [path.join(os.homedir(), '.local/share/Steam'), path.join(os.homedir(), '.steam/steam'),
+      path.join(os.homedir(), '.var/app/com.valvesoftware.Steam/data/Steam')];
+    const games = [...roots.flatMap(steamGames), ...require('./linux').epicGames()];
+    const programs = await require('./linux').desktopApps();
+    const seen = new Set();
+    const items = [...games, ...programs].filter((item) => {
+      const key = `${item.kind}:${item.id}`;
+      if (seen.has(key) || SKIP.test(item.name)) return false;
+      seen.add(key);
+      return true;
+    });
+    cache = { at: Date.now(), items };
+    return items;
+  }
   if (!WIN) return [];
   const items = [];
   const seen = new Set();
@@ -136,7 +152,9 @@ async function launch({ kind, id } = {}) {
   const item = (await launchables()).find((i) => i.kind === kind && i.id === id);
   if (!item) throw new Error('not found');
   if (kind === 'steam') return shell.openExternal(`steam://rungameid/${id}`);
+  if (kind === 'epic' && process.platform === 'linux') return shell.openExternal(`heroic://launch/legendary/${encodeURIComponent(id)}`);
   if (kind === 'epic') return shell.openExternal(`com.epicgames.launcher://apps/${encodeURIComponent(id)}?action=launch&silent=true`);
+  if (process.platform === 'linux') return require('./linux').launchApp(id);
   spawn('explorer.exe', [`shell:AppsFolder\\${id}`], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
   return undefined;
 }
@@ -149,6 +167,7 @@ const KEY_DOWN = 1; // KEYEVENTF_EXTENDEDKEY
 const KEY_UP = 3;   // ...and KEYEVENTF_KEYUP
 
 async function media(action) {
+  if (process.platform === 'linux') return require('./linux').media(action);
   if (!WIN || !MEDIA[action]) return false;
   const [key, times] = MEDIA[action];
   return powershell(

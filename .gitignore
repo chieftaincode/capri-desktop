@@ -7,3 +7,6 @@ Thumbs.db
 
 # local debug captures
 captures/
+__pycache__/
+*.pyc
+.runtime/

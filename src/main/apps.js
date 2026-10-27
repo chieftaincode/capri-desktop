@@ -24,6 +24,7 @@ function powershell(script, timeout = 15000) {
 
 // [{ name, process, ids }]: one per program with a window open ("AM Music", "Discord"...)
 async function list() {
+  if (process.platform === 'linux') return require('./linux').openApps();
   if (process.platform !== 'win32') return [];
   const out = await powershell(
     'Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle } | '
@@ -62,6 +63,7 @@ async function find(wanted) {
 // Closes it like its close button would; `force` ends it outright (unsaved work is lost).
 // Resolves with what's left: { running } (true when it stayed open, or hid in the tray).
 async function close(name, { force = false } = {}) {
+  if (process.platform === 'linux') return require('./linux').closeApp(name, { force });
   const app = (await list()).find((a) => a.process === name);
   if (!app) return { running: false };
   const ids = app.ids.join(',');

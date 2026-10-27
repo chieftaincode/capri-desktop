@@ -155,6 +155,28 @@ async function boot() {
   let seen = null;
   let rearmedAt = -Infinity;
   let follow = null; // (pointer) => she may follow it to another screen (below)
+  // Linux doesn't implement Electron's forwarded mousemove option. Poll the
+  // global pointer so transparent areas stay clickable and Capri reacts promptly.
+  if (config.platform === 'linux') {
+    let pending = false;
+    setInterval(async () => {
+      if (pending) return;
+      pending = true;
+      try {
+        const at = await host.cursor();
+        const next = at?.inside ? { x: at.x, y: at.y } : null;
+        if (next && (!mouse || next.x !== mouse.x || next.y !== mouse.y)) {
+          const now = performance.now();
+          if (now - lastMove > AWAY_MS) onBack?.(now - lastMove);
+          lastMove = now;
+        }
+        mouse = next;
+        refreshHit();
+        hoverChip();
+      } catch { /* shutting down */ }
+      finally { pending = false; }
+    }, 50);
+  }
   setInterval(async () => {
     const at = await host.cursor().catch(() => null);
     const before = seen;
@@ -170,7 +192,7 @@ async function boot() {
     if (!before?.inside || (at.x === before.x && at.y === before.y)) return;
     if (now - lastMove < WATCH_MS * 1.5 || now - rearmedAt < 20000) return;
     rearmedAt = now;
-    host.rearm();
+    if (config.platform !== 'linux') host.rearm();
   }, WATCH_MS);
   window.addEventListener('contextmenu', (e) => {
     e.preventDefault();

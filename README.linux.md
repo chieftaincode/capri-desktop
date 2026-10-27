@@ -1,0 +1,102 @@
+# Capri auf Arch / CachyOS mit KDE Plasma 6
+
+Diese Portierung basiert auf dem unveränderten Upstream-Commit
+[`f7685d2`](https://github.com/mochiiwuff/capri-desktop/commit/f7685d2295ed21b238537a258934cb8fc3e72f49).
+Der ursprüngliche Commit und sein Quellbaum wurden per Git-SHA überprüft; die
+lokale Historie ist zunächst flach und wird beim Abschluss vervollständigt.
+
+## Auf diesem Rechner abschließen
+
+Im normalen Desktop-Terminal ausführen:
+
+```bash
+bash /run/media/elia/S/capri-desktop/scripts/finish-setup.sh
+```
+
+Das Skript benutzt die bereits angemeldete GitHub-CLI, erstellt den Fork, lädt
+den Branch `arch-linux` hoch, führt die vollständigen Tests aus, installiert einen
+Eintrag im Anwendungsmenü und die Hooks für den vorhandenen Coding-Assistenten
+(Codex bevorzugt, sonst Claude Code) und startet Capri. Bestehende fremde Hooks
+bleiben erhalten; die Upstream-Installer schreiben Sicherungskopien.
+Ein vorhandenes fremdes Repository oder ein abweichendes `origin` wird nicht
+überschrieben. Kein Autostart wird ungefragt aktiviert.
+
+Danach den Coding-Assistenten neu starten. Autostart kann im Capri-Menü über
+**Start at login** eingeschaltet werden. Rechtsklick auf Capri oder ihr Tray-Symbol
+öffnet das Menü. `Strg+Alt+C` legt sie weg oder holt sie zurück.
+
+Die Logs liegen in `.runtime/setup.log` und `.runtime/capri.log`.
+
+## Änderungen
+
+| Funktion | Linux-Anbindung |
+| --- | --- |
+| Auf Fenstern sitzen, mitfahren, fallen, Fenster-Effekte | Temporäres KWin-6-Skript für native Wayland- und X11-Fenster, inklusive Stapelreihenfolge, Arbeitsflächen und Aktivitäten |
+| Aktives Fenster, Antworten bei Fokuswechsel, andere AIs erkennen | KWin meldet IDs und AI-Namensübereinstimmungen; Fenstertitel und Inhalte werden nicht übertragen |
+| Transparenz und Mausinteraktion | Electron läuft unter XWayland; Zeigerabfrage ersetzt die unter Linux fehlende Weiterleitung von Mausbewegungen |
+| Mehrere Bildschirme | Vorhandene Electron-Bildschirmsteuerung, KWin-Koordinaten und globaler Mauszeiger |
+| Anwendungen öffnen | Gio-Anwendungskatalog und `gtk-launch`, einschließlich registrierter Flatpak-Programme |
+| Anwendungen schließen | KWin sendet normales Schließen an die ausdrücklich ausgewählten Fenster; erzwungenes Beenden bleibt hinter der vorhandenen Bestätigung |
+| Spiele starten | Steam-Bibliotheken einschließlich Flatpak; Epic-Manifeste von Heroic und Start über dessen URI |
+| Musik und Lautstärke | MPRIS über den Desktop-Bus; PipeWire/WirePlumber über `wpctl` |
+| Start bei Anmeldung | Benutzerbezogene XDG-Autostart-Datei |
+| Ollama-Start mit Coding-Assistent | Eigener Konsole-Aufruf anstelle von `cmd.exe` |
+| Missionsbericht kopieren | Kompatibilität mit der Zwischenablage von Electron 42 |
+| Animationen, Sprache, Sound, Chat, Erinnerungen, Bond, Hooks | Vorhandener Upstream-Code bleibt in Verwendung |
+
+Das KWin-Skript wird beim Start temporär geladen und beim Beenden entladen.
+Es verändert keine KWin-Regeln und installiert kein dauerhaft aktives Plugin.
+Die Anbindung nutzt die [offizielle KWin-Scripting-API](https://develop.kde.org/docs/plasma/kwin/api/).
+Für X11 ohne KDE gibt es eine EWMH-Anbindung über Python-Xlib. Andere
+Wayland-Compositoren sind mit dieser Portierung nicht unterstützt.
+
+Chat benötigt einen vorhandenen Ollama-Server samt Modell oder einen der bereits
+unterstützten API-Anbieter samt Zugang. Ein lokaler Ollama-Befehl ist auf diesem
+Rechner vorhanden; Erreichbarkeit und Modelle konnten in der eingeschränkten
+Coding-Sitzung nicht geprüft werden. Es wurden keine Modelle heruntergeladen.
+Heroic muss für Epic-Starts installiert und als URI-Handler registriert sein.
+
+## Voraussetzungen und Befehle
+
+Auf diesem Rechner sind Node.js, Electron 42, Python, python-dbus,
+python-gobject, python-xlib, qt6-tools, gtk3 und WirePlumber vorhanden.
+Bei einer Neuinstallation auf Arch:
+
+```bash
+sudo pacman -S --needed nodejs npm electron42 python python-dbus python-gobject python-xlib qt6-tools gtk3 wireplumber
+npm install --ignore-scripts
+npm start
+```
+
+Der Linux-Starter verwendet den installierten Electron und verhindert den
+`isPackaged`-Override des Arch-Wrappers im Quellbetrieb. Mit `CAPRI_ELECTRON`
+kann ein anderer kompatibler Electron-Pfad gewählt werden. Der Chromium-Sandbox
+wird kein Abschaltflag übergeben.
+
+```bash
+npm run dev:linux       # Debug-Brücke und Entwicklungsmenü
+npm run check:linux     # Voraussetzungen und KWin-Zugriff prüfen
+npm test               # Alle Tests einschließlich lokaler HTTP-Integration
+npm run dist:linux     # Linux-Verzeichnis mit dem vorhandenen Electron 42 bauen
+node scripts/install-linux.js --uninstall  # Menüeintrag und Autostart entfernen
+```
+
+Das gebaute Programm liegt unter `dist/linux-unpacked/capri`.
+Der Haupt-Electron-Prozess, Node-Installation und lokale Quellen müssen mit dem
+Benutzerkonto laufen; kein `sudo` für Start oder Einrichtung.
+
+## Prüfstand dieser Portierung
+
+Die KWin-Vertragsprüfungen (simulierte API), der echte Gio-Anwendungskatalog,
+Desktop-Dateien einschließlich Sonderzeichen und die netzwerkfreien Hook-Tests
+wurden lokal geprüft. Ein Linux-Paket wurde aus dem System-Electron gebaut.
+
+Die Coding-Sandbox verweigert Desktop-D-Bus, lokale Listen-Sockets und den
+grafischen Electron-Start. Deshalb ist die Portierung **noch nicht grafisch auf
+der laufenden KDE-Sitzung abgenommen**. Fenster- und Eingabeverhalten, insbesondere
+bei unterschiedlichen Skalierungsfaktoren mehrerer Bildschirme, müssen im echten
+Desktop geprüft werden. Das Abschluss-Skript führt dort die vollständigen
+Hook-Tests, die KWin-Zugriffsprüfung und einen Bridge-Healthcheck aus.
+
+Die Lizenz und Rechte an Figurenbildern bleiben unverändert; siehe [README](README.md)
+und [LICENSE](LICENSE).
