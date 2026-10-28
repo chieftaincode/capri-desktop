@@ -48,6 +48,13 @@ async function main() {
     const stored = config.apiKeys?.groq || process.env.GROQ_API_KEY || '';
     const key = stored.startsWith('enc:') ? safeStorage.decryptString(Buffer.from(stored.slice(4), 'base64')) : stored;
     if (!key) throw new Error('Groq key unavailable');
+    if (process.argv.includes('--repair')) {
+      stage('testing-replacement-model');
+      const result = await require('./repair-groq-linux').probe(key);
+      fs.writeFileSync(path.join(dir, 'groq-repair.json'), JSON.stringify(result, null, 2) + '\n', { mode: 0o600 });
+      console.log(JSON.stringify(result));
+      return;
+    }
     const saved = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'memory.json'), 'utf8'));
     const history = (saved.history || []).slice(-18).filter((m) => ['user', 'assistant'].includes(m.role));
     while (history.length && history[0].role !== 'user') history.shift();

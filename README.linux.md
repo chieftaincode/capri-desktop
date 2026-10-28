@@ -60,6 +60,19 @@ HTTP 429 wird als Rate-Limit behandelt und löst keine sofortige automatische
 Wiederholung oder Modellwechsel aus. Die ursprüngliche Provider-Meldung bleibt
 sichtbar.
 
+Für die auf diesem Rechner beobachteten Qwen-Antwortfragmente:
+
+```bash
+node /run/media/elia/S/capri-desktop/scripts/repair-groq-linux.js
+```
+
+Das Skript prüft zunächst eine vollständige Antwort von `openai/gpt-oss-120b`
+über den vorhandenen Groq-Zugang. Bei erfolgreicher Prüfung wird Capri gestoppt,
+der alte Chatverlauf neben `memory.json` archiviert und ein neues Gespräch mit dem
+geprüften Modell begonnen. Konfiguration und Verlauf werden vorher gesichert;
+persönliche Erinnerungen, Bond und Claude-Code-Anbindung bleiben erhalten.
+Die Prüfmetadaten stehen in `.runtime/groq-repair.json`.
+
 ## Änderungen
 
 | Funktion | Linux-Anbindung |

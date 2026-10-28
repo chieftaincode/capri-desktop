@@ -101,7 +101,8 @@ async function openaiChat(p, { model, messages }, onDelta, signal) {
         method: 'POST',
         headers: headers(p.key),
         body: JSON.stringify({ model, messages: nextMessages, stream: true,
-          ...(p.env === 'GROQ_API_KEY' ? { max_completion_tokens: 4096 } : {}) }),
+          ...(p.env === 'GROQ_API_KEY' ? { max_completion_tokens: 4096,
+            ...(/^openai\/gpt-oss-(20b|120b)$/.test(model) ? { reasoning_effort: 'low', include_reasoning: false } : {}) } : {}) }),
         signal,
       });
       if (!res.ok) {

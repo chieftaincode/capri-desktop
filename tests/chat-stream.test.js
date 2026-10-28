@@ -48,6 +48,17 @@ test('Normal completion is accepted even without punctuation, with no extra requ
   assert.equal(fetch.mock.callCount(), 1);
 });
 
+test('Groq GPT-OSS chat uses the settings verified by the repair probe', async (t) => {
+  let body;
+  t.mock.method(globalThis, 'fetch', async (_url, options) => {
+    body = JSON.parse(options.body);
+    return reply('A complete reply.', 'stop');
+  });
+  await chat('groq', cfg, { ...input, model: 'openai/gpt-oss-120b' }, () => {});
+  assert.equal(body.reasoning_effort, 'low');
+  assert.equal(body.include_reasoning, false);
+});
+
 test('Empty provider completions fail visibly instead of becoming ellipses in memory', async (t) => {
   const fetch = t.mock.method(globalThis, 'fetch', async () => reply('', 'stop'));
   await assert.rejects(chat('groq', cfg, input, () => {}), /Empty answer/);
