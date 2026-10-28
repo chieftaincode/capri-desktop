@@ -13,10 +13,11 @@ async function loadChat() {
   globalThis.matchMedia = () => ({ matches: true });
   try {
     fs.writeFileSync(path.join(dir, 'package.json'), '{"type":"module"}');
-    for (const file of ['chat.js', 'chat-context.js', 'util.js', 'lines.js', 'reminders.js']) {
+    for (const file of ['chat.js', 'chat-context.js', 'util.js', 'lines.js', 'reminders.js', 'bond.js']) {
       fs.copyFileSync(path.join(__dirname, '../src/renderer/js', file), path.join(dir, file));
     }
-    return await import(pathToFileURL(path.join(dir, 'chat.js')).href);
+    return { ...await import(pathToFileURL(path.join(dir, 'chat.js')).href),
+      ...await import(pathToFileURL(path.join(dir, 'bond.js')).href) };
   } finally {
     if (previous === undefined) delete globalThis.matchMedia;
     else globalThis.matchMedia = previous;
@@ -24,6 +25,39 @@ async function loadChat() {
   }
 }
 const chatModule = loadChat();
+
+test('A throw influences one chat reaction, then stays in the background; later throws and failures are handled separately', async () => {
+  const { Chat, Bond } = await chatModule;
+  const bond = Object.create(Bond.prototype);
+  const requests = [];
+  let outcome = { ok: true, text: 'I am here.' }, duringReply = () => {};
+  const host = { onChatDelta() {}, chatRemember() {}, openApps: async () => [],
+    chatSend: async (request) => { requests.push(request); duringReply(); return outcome; } };
+  const panel = { setChatBusy() {}, setActions() {}, chatTurn() {}, setFace() {}, stream() {} };
+  const chat = new Chat({ host, panel, capri: { pulse() {} }, brain: { t: { chat: { failed: 'Failed:' } } } });
+  chat.bond = bond;
+  chat.open = true;
+  chat.persona = () => bond.moodLine();
+  chat.asked = () => null;
+  chat.after = () => {};
+  bond.feel('thrown');
+  await chat.send('Hello');
+  assert.match(requests[0].messages[0].content, /A moment ago/);
+  await chat.send('Hello');
+  assert.doesNotMatch(requests[1].messages[0].content, /A moment ago/);
+  assert.match(requests[1].messages[0].content, /already reacted/);
+  assert.doesNotMatch(requests[1].messages.at(-1).content, /A moment ago/);
+  bond.feel('dizzy');
+  outcome = { ok: false, error: 'connection lost' };
+  await chat.send('Hello');
+  assert.match(bond.moodLine(), /Right now:/, 'a failed answer does not acknowledge the new event');
+  outcome = { ok: true, text: 'I am here.' };
+  duringReply = () => bond.feel('thrown');
+  await chat.send('Hello');
+  assert.match(bond.moodLine(), /Right now:/, 'a throw during the request must not be acknowledged by an older answer');
+  bond.mood.until = Date.now() - 1;
+  assert.equal(bond.moodLine(), '');
+});
 
 test('Chat context skips orphan answers and legacy empty placeholders without changing saved history', async () => {
   const source = fs.readFileSync(path.join(__dirname, '../src/renderer/js/chat-context.js'), 'utf8');

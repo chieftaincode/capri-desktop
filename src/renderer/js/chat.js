@@ -219,6 +219,7 @@ export class Chat {
       else this.history.splice(at, 0, { role: 'assistant', content: this.opening });
       this.opening = null;
     }
+    const replyMood = this.bond?.mood;
     const messages = [{ role: 'system', content: this.persona() }, ...chatContext(this.history, REMEMBER)];
     // In a mood (angry, sulking…): said again right by your message, for this answer only. Small
     // local models mostly go by the last thing they read: up in her prompt alone, they forget it.
@@ -259,6 +260,7 @@ export class Chat {
       return;
     }
     this.warm = true;
+    this.bond?.replied?.(replyMood);
     this.remember({ role: 'assistant', content: answer });
     this.panel.stream(answer, { done: true });
     this.panel.setFace(mood(answer));

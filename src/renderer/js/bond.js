@@ -32,6 +32,11 @@ const FEELINGS = {
   happy: ['You feel closer to the user than ever (your sync with them just reached {percent}%). You are happy, and a little shy about it.', 5],
   forgiven: ['The user just said sorry. You forgive them, a little grudgingly, and you are nicer to them again.', 3],
 };
+const MOOD_TONE = {
+  thrown: 'a little shaken, recovering', fun: 'excited and playful', dizzy: 'a little dizzy and grumpy',
+  angry: 'annoyed and a little sarcastic', jealous: 'a little jealous', sulk: 'a little hurt and sulky',
+  happy: 'happy and a little shy', forgiven: 'warmer, having accepted the apology',
+};
 // "sorry", in her five languages
 const SORRY = /(?<![\p{L}])(sorry|my bad|i apologi[sz]e|pardon|d[ée]sol[ée]e?|dsl|excuse[- ]moi|je m['’]excuse|lo siento|perd[oó]n|disculpa|desculp[ae]|foi mal|прости|извини)(?![\p{L}])/iu;
 
@@ -70,7 +75,17 @@ export class Bond {
   // For her chat: how she feels right now, if anything.
   moodLine() {
     const kind = this.feeling;
-    return kind ? `Right now: ${fmt(FEELINGS[kind][0], this.mood.vars)}` : '';
+    if (!kind) return '';
+    if (this.mood.mentioned) {
+      return `Background mood: ${MOOD_TONE[kind]}. You already reacted to the event that caused it. Answer the user's current message directly; do not repeat the earlier reaction or bring up that event unless they ask about it.`;
+    }
+    return `Right now: ${fmt(FEELINGS[kind][0], this.mood.vars)} React briefly if relevant, then answer the user's current message.`;
+  }
+
+  // A successful chat answer acknowledges only the mood that was present when
+  // that answer started. A newer throw during the request still gets a reaction.
+  replied(mood) {
+    if (mood && this.mood === mood) mood.mentioned = true;
   }
 
   get stage() {
